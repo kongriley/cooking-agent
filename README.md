@@ -36,11 +36,11 @@ before you ask.
 **Your kitchen.** Basil starts knowing nothing. It doesn't assume an empty pantry or a full one. It records what you
 mention: each item with how much you have ("half a lemon", "2 packets") and where it lives (fridge, freezer, pantry,
 spices, tools), plus burners, ovens, number of cooks, skill and diet. It asks about the unknowns that matter. The
-Kitchen sheet shows all of this as shelves of photos.
+Kitchen sheet lists all of this, shelf by shelf.
 
 **Recipes and planning.** For decisions worth getting right, such as choosing a recipe, planning, or recovering when
-something goes wrong, Basil consults Claude Opus (`think_it_through`). Meanwhile the screen shows "Thinking it
-through…". Basil then saves a plan: cookbook-voice steps, each with a duration, dependencies, the burner or oven it
+something goes wrong, Basil consults Claude Opus (`think_it_through`). Meanwhile the screen shows
+"Thinking…". Basil then saves a plan: cookbook-voice steps, each with a duration, dependencies, the burner or oven it
 takes, whether it's hands-on, and which ingredients it uses. The code does the scheduling, not the model:
 - the critical path goes first;
 - one cook never gets two hands-on steps at once;
@@ -49,25 +49,27 @@ takes, whether it's hands-on, and which ingredients it uses. The code does the s
 
 Several dishes can cook at once and are scheduled together. Each dish can be replanned or stopped on its own.
 
-**Cooking.** The middle of the screen is the current step: its title, the instruction in large type, what it needs,
-a countdown if it's running, and **Done** with the next step's name. The header shows every step as a numbered pill.
-Tap one to read ahead or go back. Beside the step are:
+**Cooking.** The middle of the screen is the current step: its title, the instruction in large type, a countdown
+if it's running, and **Done**. The header shows every step as a numbered dot (a tick once done, amber while cooking on
+its own). Tap one to read ahead or go back. Beside the step are:
 - a picture of that step: a real Wikimedia Commons photo when Claude confirms it shows the step, otherwise a
   generated illustration labelled as one;
-- the dish's ingredient list, cookbook style, with what's missing gathered at the top and an "Add to Instacart cart"
-  button.
+- the dish's ingredient list, cookbook style: amount, then name. What the step uses is darker, what's missing is red,
+  and one button buys what's missing.
 
 **Timers.** These run in the server, not the model. Starting a hands-off step sets one automatically. Basil gives a
 heads-up a minute before timers of four minutes or more. When one goes off, Basil speaks without being asked, waiting
 a few seconds if someone is mid-sentence. The dials at the bottom pause and resume on tap. A timer that has gone off
 offers "+1 min" and "Done". You can also pause, extend or cancel timers by voice.
 
-**Captions.** The last thing you and Basil said streams in under the dials. While nothing is cooking, the
-conversation takes the middle of the screen.
+**Captions.** The last thing you and Basil said streams in above the mic, at the bottom centre. While nothing is
+cooking, the conversation takes the middle of the screen.
 
-**Memory.** Everything persists in `kitchen.json`, including the last 30 lines of conversation. On a page refresh or
-reconnect, Basil gets a recap and picks up where you were instead of greeting you again. A finished meal shows
-"Ready to eat." for an hour, then clears.
+**Memory.** Everything persists in `kitchen.json`, including the last 30 lines of conversation. Opening or refreshing
+the page shows where things stand straight away, before Basil is listening, and taps on steps and timers work without
+Basil. Tapping the mic starts the conversation; Basil gets a recap and picks up where you were instead of greeting you
+again. A finished meal shows "Ready to eat." for an hour, then clears. **Clear all**, at the bottom of the Kitchen
+sheet, starts over: the plan, timers and conversation go, the kitchen stays. It asks for a second tap.
 
 **Shopping.** Instacart has no public cart API, so a Claude computer-use agent (`shopping.py`) uses the website in a
 sandboxed Chromium (`shopper/`, Docker). It searches each item, adds a sensible match, and stops at the cart: a guard
@@ -82,7 +84,9 @@ docker run -d --name basil-shopper --restart unless-stopped -p 127.0.0.1:9223:92
 ```
 
 Sign in to Instacart once at `http://localhost:6080/vnc.html`, the sandbox's screen. The login persists in the
-volume, and you can watch the agent shop there.
+volume, and you can watch the agent shop there. Carts belong to your Instacart account and are per store, so to review
+and pay, be signed in to the same account in your own browser: **Review** opens the store the agent used, where
+"View cart" shows what it added. (Instacart has no link that opens the cart itself.)
 
 ## How it's built
 

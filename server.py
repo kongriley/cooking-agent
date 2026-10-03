@@ -24,7 +24,10 @@ from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
 
 from images import Images, StepPictures
+from kitchen import Kitchen, Timer
 from session import Session, advisor, instacart, open_session
+from timers import Timers
+from tools import Toolbox
 
 HERE = Path(__file__).parent
 # Events after which the panes need fresh state.
@@ -36,10 +39,28 @@ STEP_PICTURES_DIR = HERE / "step_pictures"
 STEP_PICTURES: StepPictures  # made at startup, once the keys are in the environment
 
 
+class StillTimers(Timers):
+    """The saved timers, with no conversation to alert: they can be paused, resumed or set, but none goes off."""
+
+    def _schedule(self, timer: Timer) -> None:
+        pass
+
+
+def saved_toolbox(kitchen_path: Path) -> Toolbox:
+    """The kitchen as saved, for the screen to show and change while Basil isn't in a conversation."""
+    kitchen = Kitchen.load(kitchen_path)
+
+    async def quiet(*_) -> None:
+        pass
+
+    timers = StillTimers(kitchen, save=lambda: kitchen.save(kitchen_path), alert=quiet, nudge=quiet)
+    return Toolbox(kitchen, kitchen_path, timers, None, on_cart_done=quiet)
+
+
 async def process_request(connection: ServerConnection, request: Request) -> Response | None:
-    if request.path == "/ws":
-        return None
     url = urllib.parse.urlsplit(request.path)
+    if url.path == "/ws":
+        return None
     if url.path == "/img":
         # Pictures load lazily from the page; the lookup runs once per name and is cached.
         query = urllib.parse.parse_qs(url.query)
@@ -81,15 +102,26 @@ async def push_state(browser: ServerConnection, session: Session) -> None:
     await browser.send(json.dumps({"type": "state", **session.toolbox.snapshot()}))
 
 
-async def handle_action(browser: ServerConnection, session: Session, message: dict) -> None:
-    """Apply a tap in the UI, then tell the agent so the conversation stays in sync with the screen."""
-    toolbox = session.toolbox
+async def apply_action(toolbox: Toolbox, message: dict) -> dict | None:
+    """Apply a tap in the UI. Returns what to tell the agent, if a conversation is running, so it stays in sync.
+
+    A tap on something that's just gone (a timer that went off a moment ago, a step already done) changes nothing;
+    it mustn't end the conversation.
+    """
+    try:
+        return await _apply_action(toolbox, message)
+    except (KeyError, ValueError):
+        logging.warning(f"ignored a tap on something that's gone: {message}")
+        return None
+
+
+async def _apply_action(toolbox: Toolbox, message: dict) -> dict | None:
     match message["action"]:
         case "step":
             step = toolbox.kitchen.step(message["step_id"])
             toolbox.update_step(step.id, message["status"])
             note = f"The user tapped '{step.text}' as {message['status']} in the app. Briefly tell them what's next."
-            await session.send({"type": "generate_reply", "system_message": f"[{note}]"})
+            return {"type": "generate_reply", "system_message": f"[{note}]"}
         case "timer":
             label, change = message["label"], message["change"]
             toolbox.adjust_timer(label, change, message.get("minutes"))
@@ -100,12 +132,12 @@ async def handle_action(browser: ServerConnection, session: Session, message: di
                 "cancel": "cancelled",
             }
             note = f"[The cook {done[change]} the '{label}' timer in the app. Say nothing about it.]"
-            await session.send({"type": "add_system_message", "system_message": note})
+            return {"type": "add_system_message", "system_message": note}
         case "timer_again":
             # A rung timer the cook wants a little longer on; the alert keeps it simple.
             toolbox.set_timer(message["label"], message["minutes"], "Check it again.")
             note = f"[The cook gave '{message['label']}' {message['minutes']} more minute(s) in the app. Say nothing.]"
-            await session.send({"type": "add_system_message", "system_message": note})
+            return {"type": "add_system_message", "system_message": note}
         case "buy_missing":
             # One tap orders what the dish's ingredient list says the cook has none of.
             recipe = toolbox.kitchen.recipes[message["dish"]]
@@ -118,15 +150,42 @@ async def handle_action(browser: ServerConnection, session: Session, message: di
             ]
             result = await toolbox.call("fill_instacart_cart", {"store": None, "items": items})
             note = f"[The cook tapped 'Add to Instacart cart' for {', '.join(i['name'] for i in missing)}: {json.dumps(result)}. Don't repeat it.]"
-            await session.send({"type": "add_system_message", "system_message": note})
+            return {"type": "add_system_message", "system_message": note}
+        case "clear_all":
+            toolbox.clear_all()
+            note = "[The cook tapped Clear all: the plan, timers and conversation are gone. Start fresh; say nothing.]"
+            return {"type": "add_system_message", "system_message": note}
         case "clear_dish":
             toolbox.clear_plan(message["dish"])
             note = f"[The cook cleared {message['dish']} from the plan in the app. Say nothing about it.]"
-            await session.send({"type": "add_system_message", "system_message": note})
+            return {"type": "add_system_message", "system_message": note}
+    return None
+
+
+async def handle_action(browser: ServerConnection, session: Session, message: dict) -> None:
+    if note := await apply_action(session.toolbox, message):
+        await session.send(note)
     await push_state(browser, session)
 
 
+async def handle_screen(browser: ServerConnection, kitchen_path: Path) -> None:
+    """The screen without Basil: shows the saved kitchen and applies taps to it. Any message asks for fresh state."""
+    try:
+        async for raw in browser:
+            message = json.loads(raw)
+            toolbox = saved_toolbox(kitchen_path)
+            # Buying needs the shopping agent, which only runs inside a conversation.
+            if message["type"] == "action" and message["action"] != "buy_missing":
+                await apply_action(toolbox, message)
+            await browser.send(json.dumps({"type": "state", **toolbox.snapshot()}))
+    except ConnectionClosed:
+        pass
+
+
 async def handle_browser(browser: ServerConnection, args: argparse.Namespace) -> None:
+    # /ws?talk=0 is the screen alone; plain /ws is a conversation with Basil, which starts only when the cook asks.
+    if urllib.parse.urlsplit(browser.request.path).query == "talk=0":
+        return await handle_screen(browser, Path(args.kitchen))
     session: Session | None = None
 
     async def forward(event: dict) -> None:

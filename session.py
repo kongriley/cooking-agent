@@ -227,6 +227,15 @@ def instacart(args) -> InstacartShopper | None:
     return None
 
 
+async def check_sign_in(session: Session, instacart: InstacartShopper) -> None:
+    try:
+        session.toolbox.signed_in = await instacart.signed_in()
+    except Exception:  # the check is a convenience; a sandbox hiccup shouldn't stop the conversation
+        logging.exception("couldn't check the Instacart sign-in")
+        return
+    await session.on_event({"type": "cart_update"})  # refreshes the screen
+
+
 @asynccontextmanager
 async def open_session(
     kitchen_path: Path,
@@ -263,12 +272,9 @@ async def open_session(
         session.toolbox = Toolbox(
             kitchen, kitchen_path, timers, instacart, on_cart_done=session.cart_done, advisor=thinker
         )
-        if instacart is not None:
-            # Known up front, so the screen can ask for the one-time sign-in before an order fails on it.
-            try:
-                session.toolbox.signed_in = await instacart.signed_in()
-            except Exception:  # the check is a convenience; a sandbox hiccup shouldn't stop the conversation
-                logging.exception("couldn't check the Instacart sign-in")
+        # Checked alongside the conversation, not before it (it loads a page, ~4 s), so the screen can ask for the
+        # one-time sign-in before an order fails on it.
+        sign_in_check = asyncio.create_task(check_sign_in(session, instacart)) if instacart is not None else None
         # With history on disk this is a reconnect: brief the agent instead of greeting the cook from scratch.
         recap = session.toolbox.recap()
         prompt = SYSTEM_PROMPT_PATH.read_text() + ("" if instacart else f"\n\n{NO_SHOPPING_NOTE}")
@@ -283,7 +289,7 @@ async def open_session(
         try:
             yield session
         finally:
-            for task in [receiving, silence, *timers.tasks.values(), session.toolbox.cart_job]:
+            for task in [receiving, silence, sign_in_check, *timers.tasks.values(), session.toolbox.cart_job]:
                 if task is None:
                     continue
                 task.cancel()

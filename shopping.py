@@ -8,6 +8,7 @@ guard backs out of any checkout page the agent reaches anyway.
 import asyncio
 import base64
 import logging
+import re
 
 import anthropic
 from playwright.async_api import Browser, Page, async_playwright
@@ -65,6 +66,13 @@ def playwright_key(combo: str) -> str:
     return "+".join(KEY_NAMES.get(part.lower(), part) for part in combo.split("+"))
 
 
+def store_url(url: str) -> str:
+    """The page of the store the agent shopped at, where 'View cart' is one tap. Instacart has no link that opens
+    the cart itself, and carts are per store, so the bare /store home doesn't show it."""
+    found = re.match(r"https://www\.instacart\.com/store/([a-z0-9-]+)(?:/|$|\?)", url)
+    return f"https://www.instacart.com/store/{found[1]}/storefront" if found else CART_URL
+
+
 class InstacartShopper:
     def __init__(self, client: anthropic.AsyncAnthropic, devtools_url: str = DEVTOOLS_URL) -> None:
         self.client = client
@@ -88,7 +96,8 @@ class InstacartShopper:
                 for i in items
             )
             task = f"Store: {store or 'any'}\nItems:\n{wanted}"
-            return await self._run(page, task)
+            report = await self._run(page, task)
+            return {**report, "cart_url": store_url(page.url)}
 
     async def _page(self, browser: Browser) -> Page:
         context = browser.contexts[0]

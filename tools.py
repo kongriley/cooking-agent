@@ -33,9 +33,9 @@ _STEP = _obj(
     },
     text={
         "type": "string",
-        "description": "One or two sentences in cookbook voice: imperative, exact, with the cue for when it's done."
-        " 'Pound the cold butter between parchment into a 7-inch square, about 1 cm thick. Chill until firm,"
-        " about 30 minutes.' Not 'Next, you'll want to...'. Say any extra detail aloud instead.",
+        "description": "At most 30 words, read at a glance: short imperative sentences, one action each, the cue for"
+        " when it's done last. 'Pound the cold butter into a 7-inch square between parchment. Chill until firm, about"
+        " 30 minutes.' Not 'Next, you'll want to...', no tips or reasons. Say any extra detail aloud instead.",
     },
     minutes={"type": "number", "description": "How long the step takes for an intermediate cook."},
     after={**_STR_LIST, "description": "Ids of steps that must finish before this one starts."},
@@ -447,6 +447,15 @@ class Toolbox:
         self.kitchen.clear_plan(dish)
         self.save()
         return {"ok": True, "cooking": self.kitchen.dishes}
+
+    def clear_all(self) -> None:
+        """Start over: every dish's plan, every timer, and the conversation go. The kitchen itself stays."""
+        self.kitchen.clear_plan(None)
+        for timer in list(self.kitchen.timers):
+            self.timers.cancel(timer.label)
+        self.kitchen.history = []
+        self.kitchen.finished_at = None
+        self.save()
 
     def show_on_screen(self, view: str) -> dict:
         # The front end opens the sheet when it sees this tool's result go by.

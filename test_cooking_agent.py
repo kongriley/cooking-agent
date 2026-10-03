@@ -606,3 +606,56 @@ def test_step_pictures_prefer_a_vetted_photo_then_illustrate_and_cache(tmp_path)
     assert photo == "https://photo/b.jpg" and drawn.endswith(".webp") and again == drawn
     assert calls == ["search", "vet", "search", "vet", "generate"]  # the repeat came from the cache
     assert no_keys is None
+
+
+def test_the_screen_changes_the_saved_kitchen_without_a_conversation(tmp_path):
+    from server import apply_action, saved_toolbox
+
+    path = tmp_path / "kitchen.json"
+
+    async def tap(message: dict) -> None:
+        await apply_action(saved_toolbox(path), {"type": "action", **message})
+
+    async def scenario() -> None:
+        toolbox = make_toolbox(tmp_path)
+        toolbox.set_plan("pasta", PASTA)
+        toolbox.set_timer("sauce", minutes=10, alert="Stir the sauce.")
+        await tap({"action": "timer", "label": "sauce", "change": "pause"})
+        assert Kitchen.load(path).timers[0].paused_left is not None
+        await tap({"action": "timer", "label": "sauce", "change": "resume"})
+        assert Kitchen.load(path).timers[0].paused_left is None
+        # A tap on a timer that has just gone off is ignored, not an error that would end the conversation.
+        await tap({"action": "timer", "label": "gone", "change": "pause"})
+        await tap({"action": "step", "step_id": "boil", "status": "done"})
+        assert Kitchen.load(path).step("boil").status == "done"
+        for task in toolbox.timers.tasks.values():
+            task.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_clear_all_starts_over_but_keeps_the_kitchen(tmp_path):
+    async def scenario() -> Toolbox:
+        toolbox = make_toolbox(tmp_path)
+        toolbox.kitchen.inventory["salt"] = {"have": "plenty", "where": "spices"}
+        toolbox.set_plan("pasta", PASTA)
+        toolbox.set_timer("sauce", minutes=10, alert="Stir the sauce.")
+        toolbox.kitchen.remember("cook", "Let's make pasta.")
+        toolbox.clear_all()
+        return toolbox
+
+    toolbox = asyncio.run(scenario())
+    saved = Kitchen.load(tmp_path / "kitchen.json")
+    assert saved.steps == [] and saved.timers == [] and saved.history == [] and saved.recipes == {}
+    assert "salt" in saved.inventory and toolbox.timers.tasks == {}
+
+
+def test_the_cart_link_goes_to_the_store_that_was_shopped():
+    from shopping import store_url
+
+    assert (
+        store_url("https://www.instacart.com/store/wegmans/s?k=butter")
+        == "https://www.instacart.com/store/wegmans/storefront"
+    )
+    assert store_url("https://www.instacart.com/store/?categoryFilter=x") == "https://www.instacart.com/store"
+    assert store_url("https://www.instacart.com/store/checkout_v3") == "https://www.instacart.com/store"
