@@ -1,0 +1,744 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Basil</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%232e6ed8'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: a cookbook page on an appliance. The plan runs across the top, the step you're on reads like a recipe on
+     the left with its ingredients beside it, and timers, captions and the mic sit along the bottom. */
+  :root {
+    --enamel: #e2e9da; --ink: #16201a; --muted: #6b7b6d; --rule: #c5d1be; --knob: #eef3ea;
+    --flame: #2e6ed8; --glow: #e3862a; --hot: #d4412a; --hot-soft: #f6dfd6;
+    --display: "Bricolage Grotesque", ui-rounded, "Avenir Next", system-ui, sans-serif;
+    --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --enamel: #111814; --ink: #e4ece0; --muted: #879889; --rule: #25312a; --knob: #18211c;
+      --flame: #6f9cff; --glow: #f0a14e; --hot: #ff6a4f; --hot-soft: #3a1f19; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --enamel: #111814; --ink: #e4ece0; --muted: #879889; --rule: #25312a; --knob: #18211c;
+    --flame: #6f9cff; --glow: #f0a14e; --hot: #ff6a4f; --hot-soft: #3a1f19; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--enamel); color: var(--ink); font-family: var(--display);
+    display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 28px;
+    padding-block: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-bottom));
+    padding-inline: clamp(16px, 5vw, 64px); user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  button:focus-visible, a:focus-visible { outline: 3px solid var(--flame); outline-offset: 3px; border-radius: 12px; }
+  [hidden] { display: none !important; }
+  .kicker { margin: 0; font: 500 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+  /* Picture tiles: a photo when one is found, the item's initial otherwise. */
+  .pic { flex: none; width: var(--size, 40px); height: var(--size, 40px); border-radius: 10px; background: var(--knob);
+    display: grid; place-items: center; overflow: hidden; font-weight: 700; color: var(--muted); }
+  .pic img { width: 100%; height: 100%; object-fit: contain; }
+  .pic.photo img { object-fit: cover; }
+
+  /* ---------- top: the dish, its steps, and the way into everything else ---------- */
+  header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 28px; align-items: center; min-height: 44px; }
+  #dish { display: flex; gap: 12px; align-items: center; --size: 44px; }
+  #dish b { font-size: 18px; line-height: 1.1; max-width: 14em; }
+  #strip { list-style: none; margin: 0; padding: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  #strip li.group { align-self: center; padding: 0 4px 0 10px; }
+  #strip button { display: flex; gap: 8px; align-items: baseline; white-space: nowrap; padding: 8px 14px; border-radius: 999px;
+    font-size: 15px; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--rule); }
+  #strip button i { font: 500 13px var(--mono); font-style: normal; }
+  #strip button:hover { color: var(--ink); }
+  #strip [data-state="done"] button { box-shadow: none; opacity: .55; }
+  #strip [data-state="running"] button { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--glow); }
+  #strip [data-state="now"] button { background: var(--ink); color: var(--enamel); box-shadow: none; }
+  #strip .viewing button { box-shadow: inset 0 0 0 2px var(--ink); color: var(--ink); opacity: 1; }
+  #chips { display: flex; gap: 8px; }
+  #chips button { padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; color: var(--muted);
+    box-shadow: inset 0 0 0 1.5px var(--rule); display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+  #chips button:hover, #chips button[aria-expanded="true"] { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  #chips .pending::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--glow); }
+  #chips .busy::before { animation: flicker 1.2s ease-in-out infinite; }
+
+  /* ---------- middle: the step, read like a recipe, and the ingredient list beside it ---------- */
+  #work { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: clamp(32px, 6vw, 88px); align-items: center; min-height: 0; }
+  #stage { display: grid; gap: 22px; align-content: center; grid-auto-rows: max-content; min-height: 0; max-width: 760px; }
+  /* max-content rows: in a height-limited grid, the clipped picture frame would otherwise shrink and overlap the list. */
+  #side { align-self: stretch; overflow-y: auto; min-height: 0; display: grid; gap: 22px; align-content: safe center; grid-auto-rows: max-content; }
+  .narrow-pic { display: none; }
+  #side .step-pic { width: 100%; }
+  #side:empty { display: none; }
+  h1 { margin: 0; font-weight: 700; font-size: clamp(36px, 4.8vw, 64px); line-height: 1; letter-spacing: -.03em; text-wrap: balance; font-variation-settings: "opsz" 96; }
+  .instruction { margin: 0; max-width: 32ch; font-size: clamp(22px, 2.3vw, 30px); line-height: 1.35; text-wrap: pretty; font-variation-settings: "opsz" 24; }
+  .head { display: grid; gap: 12px; }
+  .head .row { display: flex; gap: 14px; align-items: baseline; }
+  .back { font: 500 13px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--flame); }
+  .countdown { font: 500 clamp(34px, 3.6vw, 46px)/1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .countdown small { font: 400 16px var(--display); color: var(--muted); letter-spacing: 0; margin-left: 10px; }
+  .needs { display: grid; gap: 10px; }
+  .needs ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 28px; }
+  .needs li { display: flex; gap: 8px; align-items: baseline; font-size: 19px; }
+  .needs li b { font-weight: 700; }
+  .act { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+  .done { padding: 18px 44px; border-radius: 999px; background: var(--ink); color: var(--enamel); font-weight: 700; font-size: 20px; transition: transform .12s; }
+  .done:active { transform: scale(.96); }
+  .then { font-size: 17px; color: var(--muted); }
+  .then b { color: var(--ink); font-weight: 500; }
+  .choices { display: flex; gap: 12px; flex-wrap: wrap; }
+  .choices button, .choices a { padding: 18px 34px; border-radius: 999px; font-weight: 700; font-size: 20px; text-decoration: none; box-shadow: inset 0 0 0 2px var(--ink); }
+  .choices .yes { background: var(--ink); color: var(--enamel); }
+  .hero { --size: 180px; border-radius: 24px; }
+  /* The step's picture: room is held for it while it's being found or made, so the text doesn't jump. */
+  .step-pic { position: relative; margin: 0; width: min(100%, 420px); aspect-ratio: 3 / 2; border-radius: 18px; overflow: hidden; background: var(--knob); }
+  .step-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .step-pic.loading { animation: flicker 1.8s ease-in-out infinite; }
+  .step-pic figcaption { position: absolute; right: 10px; bottom: 8px; font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase;
+    color: #fff; background: rgb(0 0 0 / .45); padding: 3px 8px; border-radius: 999px; }
+
+  /* Ingredient list, cookbook style: amount first. Only what you're missing is marked, and gathered at the top. */
+  .recipe { display: grid; gap: 14px; }
+  .recipe h2 { margin: 0; font-size: 20px; letter-spacing: -.01em; }
+  .missing { display: grid; gap: 10px; padding: 14px 16px; border-radius: 14px; background: var(--hot-soft); }
+  .missing p { margin: 0; font-size: 16px; line-height: 1.35; }
+  .missing b { color: var(--hot); }
+  .missing button { justify-self: start; padding: 9px 16px; border-radius: 999px; background: var(--ink); color: var(--enamel); font-weight: 700; font-size: 15px; }
+  .recipe ul { list-style: none; margin: 0; padding: 0; display: grid; }
+  .recipe li { display: grid; grid-template-columns: 5.5em minmax(0, 1fr) auto; gap: 12px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--rule); font-size: 15px; color: var(--muted); }
+  .recipe li .amt { font: 500 14px var(--mono); font-variant-numeric: tabular-nums; }
+  .recipe li.now { color: var(--ink); }
+  .recipe li.now .name { font-weight: 700; }
+  .recipe li .flag { font: 500 12px var(--mono); }
+  .recipe li .flag.buy { color: var(--hot); }
+  .equipment { margin: 4px 0 0; font-size: 15px; line-height: 1.5; color: var(--muted); }
+  .equipment .now { color: var(--ink); font-weight: 700; }
+  .recipe li .flag.have { color: var(--muted); max-width: 8.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Nothing cooking: the conversation is the content, so it takes the middle of the screen. */
+  #stage > #said { gap: 14px; max-width: min(100%, 900px); }
+  #stage > #said .said { grid-template-columns: 1fr; }
+  #stage > #said .said b { display: none; }
+  #stage > #said .line { max-height: none; -webkit-mask-image: none; mask-image: none; }
+  #stage > #said .you { font-size: clamp(18px, 2vw, 22px); }
+  #stage > #said .basil { font-size: clamp(26px, 3.2vw, 40px); line-height: 1.3; letter-spacing: -.01em; }
+
+  /* ---------- bottom: timers, captions, mic ---------- */
+  footer { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 28px; align-items: end; }
+  #said { display: grid; gap: 4px; min-width: 0; justify-self: end; width: min(100%, 560px); }
+  .said { margin: 0; display: grid; grid-template-columns: 3.6em minmax(0, 1fr); gap: 10px; font-size: 16px; line-height: 1.4; color: var(--muted); }
+  .said b { font: 500 11px/1.9 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  .said .line { max-height: 2.8em; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 1.1em); mask-image: linear-gradient(to bottom, transparent 0, #000 1.1em); }
+  .said .line:has(> span:only-child) { -webkit-mask-image: none; mask-image: none; }
+  .said.basil .line { color: var(--ink); }
+  .said .line i { font-style: normal; animation: appear .35s ease-out; }
+  .said.you.live .line { opacity: .7; }
+  .said.pondering .line { color: var(--muted); animation: flicker 1.6s ease-in-out infinite; }
+  @keyframes appear { from { opacity: 0; } }
+
+  #mic { display: grid; justify-items: center; gap: 8px; font: 500 12px var(--mono); color: var(--muted); }
+  #mic .disc { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: var(--knob); color: var(--ink); transition: background .3s, color .3s, box-shadow .3s, transform .15s; }
+  #mic svg { width: 28px; height: 28px; }
+  #mic-word:empty { display: none; }
+  #mic-word { max-width: 18em; text-align: center; }
+  #mic .slash { display: none; }
+  #mic[data-mode="listening"] .disc { background: var(--flame); color: var(--enamel); box-shadow: 0 0 0 6px color-mix(in srgb, var(--flame) 16%, transparent); }
+  #mic[data-mode="you"] .disc { background: var(--flame); color: var(--enamel); transform: scale(1.06); box-shadow: 0 0 0 11px color-mix(in srgb, var(--flame) 22%, transparent); }
+  #mic[data-mode="thinking"] .disc { background: var(--glow); color: var(--enamel); animation: flicker 1.4s ease-in-out infinite; }
+  #mic[data-mode="talking"] .disc { background: var(--glow); color: var(--enamel); animation: glow .8s ease-in-out infinite alternate; }
+  #mic[data-mode="off"] .disc { box-shadow: inset 0 0 0 2px var(--muted); color: var(--muted); }
+  #mic[data-mode="off"] .slash { display: inline; }
+  @keyframes flicker { 50% { opacity: .45; } }
+  @keyframes glow { to { box-shadow: 0 0 0 9px color-mix(in srgb, var(--glow) 25%, transparent); } }
+
+  /* Timer dials: the dial is the control (tap to pause); a rung one asks the only two questions left. */
+  #timers { display: flex; flex-wrap: wrap; gap: 16px; min-width: 0; }
+  .dial { display: grid; justify-items: center; gap: 6px; width: 108px; }
+  .dial .face { position: relative; width: 108px; height: 108px; border-radius: 50%; background: var(--knob); display: grid; place-items: center; transition: transform .12s; }
+  .dial button.face:active { transform: scale(.96); }
+  .dial svg { position: absolute; inset: 0; }
+  .dial .track { fill: none; stroke: var(--rule); stroke-width: 5; }
+  .dial .ring { fill: none; stroke: var(--ink); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  .dial b { position: relative; font: 500 23px var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .dial > span { font-size: 14px; color: var(--muted); text-align: center; line-height: 1.2; }
+  .dial.soon .ring { stroke: var(--hot); }
+  .dial.soon b { color: var(--hot); }
+  .dial.paused .face { opacity: .6; }
+  .dial.paused b::after { content: " paused"; display: block; font: 400 11px var(--mono); text-align: center; color: var(--muted); }
+  .dial.rang .face { background: var(--hot); color: var(--enamel); }
+  .dial.rang .face b { font: 700 18px var(--display); }
+  .dial .ctl { display: flex; gap: 6px; white-space: nowrap; }
+  .dial .ctl button { padding: 6px 12px; border-radius: 999px; font: 500 13px var(--mono); box-shadow: inset 0 0 0 1.5px var(--rule); }
+  .dial .ctl button.primary { background: var(--ink); color: var(--enamel); box-shadow: none; }
+
+  /* ---------- sheets ---------- */
+  #sheet { position: fixed; z-index: 3; top: calc(max(20px, env(safe-area-inset-top)) + 64px); right: clamp(16px, 5vw, 64px);
+    width: min(560px, calc(100% - 32px)); max-height: calc(100% - 220px); background: var(--knob); border-radius: 22px; padding: 22px 24px; overflow-y: auto;
+    box-shadow: 0 18px 50px color-mix(in srgb, var(--ink) 22%, transparent); display: grid; align-content: start; gap: 22px; animation: slide .2s ease-out; }
+  @keyframes slide { from { transform: translateX(16px); opacity: 0; } }
+  #sheet .top { display: flex; justify-content: space-between; align-items: baseline; }
+  #sheet h2 { margin: 0; font-size: 26px; letter-spacing: -.02em; }
+  #sheet .top button { font: 500 13px var(--mono); color: var(--muted); padding: 6px 2px; }
+  #sheet section { display: grid; gap: 10px; }
+  #sheet p { margin: 0; line-height: 1.45; }
+  #sheet .unknown { color: var(--muted); }
+  #sheet .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  #sheet .row button { font: 500 13px var(--mono); color: var(--muted); }
+  #sheet .row button:hover { color: var(--hot); }
+  #sheet .recipe h2 { display: none; }
+  .shelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 12px; }
+  .stock { display: grid; justify-items: center; gap: 4px; text-align: center; --size: 60px; }
+  .stock b { font-size: 14px; font-weight: 500; line-height: 1.2; }
+  .stock span { font: 400 12px var(--mono); color: var(--muted); }
+  .stock.out { opacity: .45; }
+  .stock.out span { color: var(--hot); }
+  .order { display: grid; gap: 2px; padding-bottom: 14px; border-bottom: 1px solid var(--rule); }
+  .order:last-child { border: 0; }
+  .order b { font-size: 18px; }
+  .meta { font: 400 14px var(--mono); color: var(--muted); }
+  .open.small { justify-self: start; margin-top: 6px; padding: 6px 14px; border-radius: 999px; font-weight: 600; font-size: 14px; text-decoration: none; background: var(--ink); color: var(--knob); }
+
+  #start { position: fixed; inset: 0; z-index: 4; background: var(--enamel); display: grid; place-content: center; justify-items: center; gap: 22px; }
+  #start i { width: 104px; height: 104px; border-radius: 50%; background: var(--flame); box-shadow: 0 0 0 16px color-mix(in srgb, var(--flame) 15%, transparent); }
+  #start span { font-weight: 700; font-size: 26px; letter-spacing: -.02em; }
+
+  /* When the strip can't fit every title, keep the one you're on (or looking at) and show numbers for the rest. */
+  @media (max-width: 1400px) { #strip li:not([data-state="now"]):not(.viewing) button span { display: none; } }
+  @media (max-width: 900px) {
+    header { grid-template-columns: auto auto; gap: 14px; }
+    #chips { justify-self: end; }
+    #strip { grid-column: 1 / -1; grid-row: 2; }
+    #work { grid-template-columns: 1fr; align-items: start; overflow-y: auto; }
+    #stage { align-content: start; }
+    .narrow-pic { display: block; }
+    /* Short on a phone, so the heading and instruction still show above the pinned Done. */
+    .step-pic { width: 100%; aspect-ratio: 5 / 2; }
+    /* The one thing to do stays on screen however long the step is. */
+    .act { position: sticky; bottom: 0; padding-block: 12px 4px; background: var(--enamel); }
+    #timers { flex-wrap: nowrap; overflow-x: auto; }
+    #side { display: none; }
+    footer { grid-template-columns: minmax(0, 1fr) auto; }
+    #said { grid-column: 1 / -1; grid-row: 1; justify-self: stretch; width: auto; }
+    #mic { justify-self: end; }
+    #sheet { top: auto; bottom: 16px; left: 16px; right: 16px; width: auto; max-height: 76%; animation-name: rise; }
+    @keyframes rise { from { transform: translateY(16px); opacity: 0; } }
+  }
+  @media (min-width: 901px) { #chips .narrow { display: none; } }
+  @media (max-width: 640px) {
+    /* A phone's height goes to the step: smaller dials, only Basil's line in the captions, Done alone in the pinned bar. */
+    #dish b { font-size: 16px; }
+    .done { width: 100%; }
+    .act .then { display: none; }
+    .said.you { display: none; }
+    body { gap: 14px; }
+    .dial { width: 72px; } .dial .face { width: 72px; height: 72px; } .dial b { font-size: 15px; } .dial > span { font-size: 12px; }
+    #mic .disc { width: 60px; height: 60px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<button id="start" aria-label="Start cooking"><i></i><span>Start cooking</span></button>
+<header>
+  <div id="dish"></div>
+  <ol id="strip" aria-label="Steps"></ol>
+  <nav id="chips" aria-label="More"></nav>
+</header>
+<aside id="sheet" hidden></aside>
+<div id="work">
+  <main id="stage"></main>
+  <div id="side"></div>
+</div>
+<footer>
+  <div id="timers"></div>
+  <div id="said">
+    <p class="said you" hidden><b>You</b><span class="line"><span id="said-you"></span></span></p>
+    <p class="said basil" hidden><b>Basil</b><span class="line"><span id="said-basil"></span></span></p>
+  </div>
+  <button id="mic" data-mode="idle" aria-label="Mute or unmute the microphone">
+    <span class="disc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/><path class="slash" d="M4 4l16 16"/>
+    </svg></span>
+    <span id="mic-word"></span>
+  </button>
+</footer>
+
+<script>
+const $ = (id) => document.getElementById(id);
+// Text always goes in via textContent, so nothing the model writes can inject markup.
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === false || v == null) continue;
+    k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+  }
+  el.append(...kids.flat().filter((k) => k != null && k !== false));
+  return el;
+}
+function svg(tag, attrs = {}, ...kids) {
+  const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  el.append(...kids);
+  return el;
+}
+
+const RATE = 16000, FRAME = 320; // 20 ms frames; the API rejects chunks over 40 ms
+const R = 48, CIRC = 2 * Math.PI * R; // dial ring radius, inside a 108 px face
+let ws, ctx, mic, muted = false, state = null, stateAt = 0;
+let talking = false, hearing = false, thinking = false, consulting = false, playhead = 0;
+const playing = new Set();
+const rang = new Map(); // timer label -> {at, step_id}
+let closedBecause = ""; // Phonic's reason for ending the conversation, when it gives one
+let viewing = null; // id of a step the cook is looking ahead (or back) at; null follows the current step
+
+// ---------- connection, audio ----------
+$("start").onclick = async () => {
+  $("start").remove();
+  ctx = new AudioContext({ sampleRate: RATE });
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onmessage = (e) => onEvent(JSON.parse(e.data));
+  ws.onclose = () => { pilot("off", closedBecause || "Disconnected · reload"); mic?.getTracks().forEach((t) => t.stop()); recognizer?.abort(); };
+  render();
+  try { await startMic(); startDictation(); } catch { pilot("off", "No microphone"); }
+};
+
+async function startMic() {
+  mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+  const src = `registerProcessor("mic", class extends AudioWorkletProcessor {
+    constructor() { super(); this.buf = new Int16Array(${FRAME}); this.n = 0; }
+    process([input]) {
+      for (const s of input[0] || []) {
+        this.buf[this.n++] = Math.max(-1, Math.min(1, s)) * 0x7fff;
+        if (this.n === ${FRAME}) { this.port.postMessage(this.buf.slice().buffer); this.n = 0; }
+      }
+      return true;
+    }
+  });`;
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+  const node = new AudioWorkletNode(ctx, "mic");
+  node.port.onmessage = (e) => {
+    if (muted || ws.readyState !== 1) return;
+    let s = "";
+    for (const b of new Uint8Array(e.data)) s += String.fromCharCode(b);
+    ws.send(JSON.stringify({ type: "audio", audio: btoa(s) }));
+  };
+  ctx.createMediaStreamSource(mic).connect(node);
+  refreshPilot();
+}
+
+$("mic").onclick = () => { if (!mic) return; muted = !muted; mic.getAudioTracks().forEach((t) => (t.enabled = !muted)); refreshPilot(); };
+
+function play(audio) {
+  const bin = atob(audio), n = bin.length >> 1, buf = ctx.createBuffer(1, n, RATE), out = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) { const v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); out[i] = (v > 32767 ? v - 65536 : v) / 32768; }
+  const node = ctx.createBufferSource(); node.buffer = buf; node.connect(ctx.destination);
+  playhead = Math.max(playhead, ctx.currentTime + 0.08); // small lead absorbs network jitter
+  node.start(playhead); playhead += buf.duration;
+  playing.add(node); node.onended = () => playing.delete(node);
+}
+function hush() { playing.forEach((n) => n.stop()); playing.clear(); playhead = 0; }
+
+// Live words while the cook talks. Phonic only sends the transcript once they stop, so the browser's own speech
+// recognition fills the gap; it's shown only while Phonic hears the cook, so Basil's voice from the speakers never is.
+let recognizer = null;
+function startDictation() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) return;
+  recognizer = new Recognition();
+  recognizer.continuous = true; recognizer.interimResults = true;
+  recognizer.onresult = (e) => {
+    if (!hearing) return;
+    let text = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) text += e.results[i][0].transcript;
+    said("you", text.trim(), true);
+  };
+  recognizer.onend = () => { if (ws?.readyState === 1) setTimeout(() => recognizer.start(), 250); };
+  recognizer.start();
+}
+
+function onEvent(m) {
+  switch (m.type) {
+    case "audio_chunk": play(m.audio); if (m.text) stream(m.text); break;
+    case "input_text": said("you", m.text, false); break;
+    case "tool_started":
+      // A consult takes a while; say so, so a quiet Basil doesn't read as a frozen one.
+      if (m.tool_name === "think_it_through") { consulting = true; said("basil", "Thinking it through…", false); document.querySelector(".said.basil").classList.add("pondering"); }
+      break;
+    case "tool_result":
+      if (m.tool_name === "show_on_screen") openSheet(m.output.showing);
+      if (m.tool_name === "think_it_through") { consulting = false; document.querySelector(".said.basil").classList.remove("pondering"); }
+      break;
+    case "assistant_started_speaking": talking = true; thinking = false; document.querySelector(".said.basil").classList.remove("pondering"); said("basil", "", true); break;
+    case "assistant_finished_speaking": talking = false; live("basil", false); break;
+    case "interrupted_response": talking = false; hush(); live("basil", false); break;
+    case "user_started_speaking": hearing = true; hush(); said("you", "", true); break;
+    case "user_finished_speaking": hearing = false; thinking = true; break;
+    case "timer_fired": ring(m.label); break;
+    case "phonic_closed": closedBecause = m.reason; break;
+    case "state":
+      state = m; stateAt = Date.now();
+      // After a reload, show the last exchange from before it until someone speaks.
+      if (!$("said-you").textContent && m.said.cook) said("you", m.said.cook, false);
+      if (!basilText && m.said.basil) said("basil", m.said.basil, false);
+      for (const [label, r] of rang) if (r.step_id && m.steps.find((s) => s.id === r.step_id)?.status === "done") rang.delete(label);
+      render();
+      break;
+  }
+  refreshPilot();
+}
+
+let basilText = "";
+function said(who, text, isLive) {
+  $(`said-${who}`).textContent = text;
+  if (who === "basil") basilText = text;
+  live(who, isLive);
+}
+function live(who, on) {
+  const row = document.querySelector(`.said.${who}`);
+  row.classList.toggle("live", on);
+  row.hidden = !on && !$(`said-${who}`).textContent;
+}
+function stream(text) {
+  // Separate utterances in one turn (speech before and after a tool call) arrive with no space between them.
+  if (basilText && !/\s$/.test(basilText) && !/^\s/.test(text) && (/[.!?,:;]$/.test(basilText) || /^[A-Z]/.test(text))) text = " " + text;
+  basilText += text;
+  $("said-basil").append(h("i", {}, text));
+  live("basil", talking);
+}
+
+function pilot(mode, word) { $("mic").dataset.mode = mode; $("mic-word").textContent = word; }
+function refreshPilot() {
+  if (!ws || ws.readyState > 1) return;
+  // The icon and its color carry the state; words only for problems the cook has to fix.
+  if (!mic) return pilot("off", "No microphone");
+  pilot(muted ? "off" : talking ? "talking" : hearing ? "you" : thinking || consulting ? "thinking" : "listening", "");
+}
+
+// ---------- helpers ----------
+function act(action, extra = {}) { ws.send(JSON.stringify({ type: "action", action, ...extra })); }
+// Durations the way a recipe says them: "10 minutes", "2 hours", "1 hour 20 minutes".
+function hours(m) {
+  const unit = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  m = Math.max(1, Math.round(m));
+  if (m < 60) return unit(m, "minute");
+  return m % 60 ? `${unit(Math.floor(m / 60), "hour")} ${unit(m % 60, "minute")}` : unit(m / 60, "hour");
+}
+function clock(s) {
+  s = Math.max(0, Math.round(s));
+  const hh = Math.floor(s / 3600), mm = Math.floor((s % 3600) / 60), ss = String(s % 60).padStart(2, "0");
+  return hh ? `${hh}:${String(mm).padStart(2, "0")}:${ss}` : `${mm}:${ss}`;
+}
+function listing(items) {
+  const text = items.length < 3 ? items.join(" & ") : `${items.slice(0, -1).join(", ")} & ${items.at(-1)}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+const TOOL_WORDS = /\b(pan|pot|skillet|sheet|tray|mixer|bowl|whisk|knife|board|oven|rack|pin|scale|thermometer|colander|sieve|grater|processor|blender|dutch|spatula|tongs|mold|tin|dish)\b/i;
+// A photo, used only where it's faster to recognize than the name: the dish, and the shelves of the Kitchen view.
+// Elsewhere a missing photo shows nothing; on the shelves, where every item needs a tile, it shows the initial.
+function pic(name, kind, { initial = false } = {}) {
+  kind ||= TOOL_WORDS.test(name) ? "tool" : "ingredient";
+  const tile = h("div", { class: `pic${kind === "dish" ? " photo" : ""}`, hidden: !initial }, initial ? name.trim().charAt(0).toUpperCase() : "");
+  const img = h("img", { src: `/img?q=${encodeURIComponent(name)}&kind=${kind}`, alt: "", loading: "lazy" });
+  img.onload = () => { tile.replaceChildren(img); tile.hidden = false; };
+  return tile;
+}
+const none = (have) => have != null && /^(none|no|0|out|nothing)\b/i.test(have.trim());
+
+// ---------- shopping ----------
+const FRESH_CART_MS = 15 * 60 * 1000;
+const CART_URL = "https://www.instacart.com/store";
+// The sandboxed shopping browser's screen: where the cook signs in once, and can watch it shop.
+const VIEWER_URL = `http://${location.hostname}:6080/vnc.html?autoconnect=1&resize=scale`;
+const setAside = new Set();
+const itemName = (added) => added.split(":")[0].trim();
+function link(url, label, cls, at) {
+  const a = h("a", { class: cls, href: url, target: "_blank", rel: "noopener" }, label);
+  if (at) a.addEventListener("click", () => { setAside.add(at); setTimeout(render, 0); });
+  return a;
+}
+function cartLine(o) {
+  if (o.status === "filling") return "Filling your cart…";
+  if (o.status === "needs_login") return "Needs you to sign in to Instacart";
+  if (o.status === "interrupted") return "Stopped before finishing";
+  if (o.status === "failed") return "Couldn't shop this time";
+  return o.missing.length ? `In your cart · couldn't find ${listing(o.missing).toLowerCase()}` : "In your cart";
+}
+
+// ---------- sheets ----------
+let sheetView = null; // "shopping" | "kitchen" | "ingredients" | null
+function openSheet(view) { sheetView = view === "nothing" ? null : view; renderChips(); renderSheet(); }
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && sheetView) openSheet("nothing");
+  if (e.key === "ArrowRight") look(1);
+  if (e.key === "ArrowLeft") look(-1);
+});
+
+function renderChips() {
+  const carts = state?.carts || [];
+  const filling = carts.some((o) => o.status === "filling");
+  const chip = (view, label, cls = "") => h("button", { class: cls, "aria-expanded": String(sheetView === view),
+    onclick: () => openSheet(sheetView === view ? "nothing" : view) }, label);
+  $("chips").replaceChildren(...[
+    plan().shown && chip("ingredients", "Ingredients", "narrow"),
+    carts.length > 0 && chip("shopping", filling ? "Shopping…" : "Shopping", filling ? "pending busy" : ""),
+    state && chip("kitchen", "Kitchen", state.shopping.on && state.shopping.signed_in === false ? "pending" : ""),
+  ].filter(Boolean));
+}
+
+const PLACES = [["fridge", "Fridge"], ["freezer", "Freezer"], ["pantry", "Pantry"], ["spices", "Spices"], ["tools", "Tools"]];
+function renderSheet() {
+  const sheet = $("sheet");
+  sheet.hidden = !sheetView || !state;
+  if (sheet.hidden) return;
+  const title = { shopping: "Shopping", kitchen: "Kitchen", ingredients: "Ingredients" }[sheetView];
+  let body;
+  if (sheetView === "shopping") {
+    body = state.carts.length ? state.carts.map((o) => h("div", { class: "order" },
+      h("b", {}, listing(o.status === "ready" ? o.added.map(itemName) : o.items)), h("span", { class: "meta" }, cartLine(o)),
+      o.status === "ready" && link(CART_URL, "Review cart", "open small"),
+      ["filling", "needs_login"].includes(o.status) && link(VIEWER_URL, o.status === "filling" ? "Watch" : "Sign in", "open small")))
+      : [];
+  } else if (sheetView === "ingredients") {
+    const { shown } = plan();
+    body = shown ? [ingredientList(shown.dish, shown.uses)] : [];
+  } else {
+    const { profile: p, inventory } = state.kitchen;
+    const count = (v, unit) => v != null && `${v} ${unit}${v === 1 ? "" : "s"}`;
+    const setup = [count(p.burners, "burner"), count(p.ovens, "oven"), p.skill && `${p.skill} cook`].filter(Boolean);
+    const cooking = [...new Set(state.steps.map((s) => s.dish))];
+    const shelves = PLACES.map(([where, name]) => {
+      const items = Object.entries(inventory).filter(([, e]) => e.where === where);
+      return items.length > 0 && h("section", {}, h("p", { class: "kicker" }, name), h("div", { class: "shelf" },
+        items.map(([item, e]) => h("div", { class: `stock${none(e.have) ? " out" : ""}` }, pic(item, where === "tools" ? "tool" : "ingredient", { initial: true }),
+          h("b", {}, item), h("span", {}, none(e.have) ? "out" : e.have)))));
+    }).filter(Boolean);
+    body = [
+      state.shopping.on && state.shopping.signed_in === false && h("section", {}, h("div", { class: "row" },
+        h("p", {}, "Instacart"), link(VIEWER_URL, "Sign in", "open small"))),
+      cooking.length > 0 && h("section", {}, h("p", { class: "kicker" }, "Cooking"), ...cooking.map((dish) =>
+        h("div", { class: "row" }, h("p", {}, dish), h("button", { onclick: () => act("clear_dish", { dish }) }, "Stop")))),
+      ...shelves,
+      setup.length > 0 && h("section", {}, h("p", {}, setup.join(" · "))),
+      p.dietary_notes && h("section", {}, h("p", { class: "kicker" }, "Diet"), h("p", {}, p.dietary_notes)),
+    ];
+  }
+  sheet.replaceChildren(h("div", { class: "top" }, h("h2", {}, title), h("button", { onclick: () => openSheet("nothing") }, "Close")),
+    ...[body].flat().filter(Boolean));
+}
+
+// The dish's ingredients, cookbook style. What's missing is gathered at the top with the one thing to do about it;
+// `now` names what the shown step uses, so those lines stand out.
+const isTool = (i) => state.kitchen.inventory[i.name.toLowerCase()]?.where === "tools" || (!i.amount && TOOL_WORDS.test(i.name)) || /\bpaper\b|\bfoil\b|\bwrap\b/i.test(i.name);
+function ingredientList(dish, now = []) {
+  const all = state.recipes[dish] || [];
+  if (!all.length) return null;
+  const list = all.filter((i) => !isTool(i)), tools = all.filter(isTool);
+  const missing = all.filter((i) => none(i.have));
+  return h("section", { class: "recipe" },
+    h("h2", {}, "Ingredients"),
+    missing.length > 0 && h("div", { class: "missing" },
+      h("p", {}, h("b", {}, `Missing ${missing.length}: `), missing.map((i) => i.name).join(", ")),
+      state.shopping.on && h("button", { onclick: () => act("buy_missing", { dish }) }, "Add to Instacart cart")),
+    h("ul", {}, list.map((i) => h("li", { class: now.includes(i.name) ? "now" : false },
+      h("span", { class: "amt" }, i.amount), h("span", { class: "name" }, i.name),
+      none(i.have) ? h("span", { class: "flag buy" }, "buy")
+        : i.have == null ? h("span", { class: "flag have", title: "Basil doesn't know if you have this" }, "?")
+        : h("span", { class: "flag have", title: `You have ${i.have}` }, i.have)))),
+    tools.length > 0 && h("p", { class: "equipment" }, h("span", { class: "kicker" }, "Equipment "),
+      tools.map((t, n) => h("span", { class: now.includes(t.name) ? "now" : false }, (n ? ", " : "") + (t.amount ? `${t.name} (${t.amount})` : t.name)))));
+}
+
+// ---------- the plan ----------
+const READY_FOR_MS = 60 * 60 * 1000;
+function plan() {
+  const finished = state?.finished_at != null;
+  const eating = finished && Date.now() - state.finished_at * 1000 < READY_FOR_MS;
+  const steps = finished && !eating ? [] : state?.steps || [];
+  const open = steps.filter((s) => s.status !== "done");
+  // The step for the cook's hands: hands-on work ready now, else anything ready now, else whatever is running.
+  const ready = open.filter((s) => s.status === "pending" && s.start === 0);
+  const current = ready.find((s) => s.hands_on) || ready[0];
+  const running = open.find((s) => s.status === "in_progress");
+  const shown = steps.find((s) => s.id === viewing) || current || running;
+  return { steps, open, current, running, shown, eating };
+}
+// Look at the step before or after the one shown, without changing the plan.
+function look(delta) {
+  const { steps, current, shown } = plan();
+  if (!shown) return;
+  const i = steps.indexOf(shown) + delta;
+  if (i < 0 || i >= steps.length) return;
+  viewing = steps[i] === current ? null : steps[i].id;
+  render();
+}
+const stepNumber = (s, steps) => steps.filter((x) => x.dish === s.dish).indexOf(s) + 1;
+
+function render() {
+  const { steps, open, current, shown, eating } = plan();
+  const dishes = [...new Set(steps.map((s) => s.dish))];
+  // A cart that just finished (or needs a sign-in) takes the middle until the cook acts on it or sets it aside.
+  const fresh = (state?.carts || []).find((o) => ["ready", "needs_login"].includes(o.status)
+    && Date.now() - o.at * 1000 < FRESH_CART_MS && !setAside.has(o.at));
+  const dish = shown?.dish || steps[0]?.dish;
+
+  $("dish").replaceChildren(...(dish ? [h("b", {}, dish)] : []));
+  preloadPictures(steps);
+  $("strip").replaceChildren(...dishes.flatMap((d) => [
+    dishes.length > 1 && h("li", { class: "group kicker" }, d),
+    ...steps.filter((s) => s.dish === d).map((s) => {
+      const at = s.status === "done" ? "done" : s === current ? "now" : s.status === "in_progress" ? "running" : "todo";
+      return h("li", { "data-state": at, class: s === shown && s !== current ? "viewing" : false },
+        h("button", { title: s.title, onclick: () => { viewing = s === current ? null : s.id; render(); } },
+          h("i", {}, stepNumber(s, steps)), h("span", {}, s.title)));
+    }),
+  ]).filter(Boolean));
+
+  let view;
+  if (fresh?.status === "needs_login") {
+    view = [h("h1", {}, "Sign in to Instacart"),
+      h("div", { class: "choices" }, link(VIEWER_URL, "Sign in", "yes", fresh.at),
+        h("button", { onclick: () => { setAside.add(fresh.at); render(); } }, "Later"))];
+  } else if (fresh) {
+    view = [h("p", { class: "kicker" }, "In your Instacart cart"),
+      h("h1", {}, fresh.added.length ? listing(fresh.added.map(itemName)) : "Nothing added"),
+      fresh.missing.length > 0 && h("p", { class: "instruction" }, `Couldn't find ${listing(fresh.missing).toLowerCase()}.`),
+      h("div", { class: "choices" }, link(CART_URL, "Review and pay", "yes", fresh.at),
+        h("button", { onclick: () => { setAside.add(fresh.at); render(); } }, "Later"))];
+  } else if (shown) {
+    view = stepCard(shown, current, steps, open);
+  } else if (eating) {
+    const hero = pic(steps[0]?.dish || "Dinner", "dish");
+    hero.classList.add("hero");
+    view = [hero, h("h1", {}, "Ready to eat.")];
+  } else {
+    view = [$("said")];
+  }
+  // Captions live by the mic, except when nothing is cooking and the conversation takes the middle.
+  if (!view.includes($("said"))) $("timers").after($("said"));
+  $("stage").replaceChildren(...view.filter(Boolean));
+  // The right column shows the step (its picture) and what it takes (the ingredients); the left is words and action.
+  $("side").replaceChildren(...[shown && !fresh && stepPicture(shown), shown && !fresh && ingredientList(shown.dish, shown.uses)].filter(Boolean));
+  if (shown && !fresh) $("stage").prepend(h("div", { class: "narrow-pic" }, stepPicture(shown)));
+  renderChips();
+  if (sheetView) renderSheet();
+  renderTimers();
+}
+
+// Each step's picture: a real photo when one shows the step, otherwise a generated illustration (labelled as one).
+const pictures = new Map(); // picture request URL -> promise of {url, illustration}
+function picture(s) {
+  const key = `/steppic?${new URLSearchParams({ dish: s.dish, title: s.title, text: s.text })}`;
+  if (!pictures.has(key)) pictures.set(key, fetch(key).then((r) => r.json()).catch(() => ({ url: null })));
+  return pictures.get(key);
+}
+// Asked for as soon as the plan exists, so stepping ahead never waits on a picture being made.
+function preloadPictures(steps) { steps.forEach(picture); }
+function stepPicture(s) {
+  const frame = h("figure", { class: "step-pic loading" });
+  picture(s).then(({ url, illustration }) => {
+    if (!url) return frame.remove();
+    const img = h("img", { src: url, alt: "" });
+    img.onload = () => { frame.classList.remove("loading"); frame.replaceChildren(img, illustration && h("figcaption", {}, "Illustration")); };
+    img.onerror = () => frame.remove();
+  });
+  return frame;
+}
+
+function stepCard(s, current, steps, open) {
+  const recipe = state.recipes[s.dish] || [];
+  const uses = s.uses.map((name) => recipe.find((r) => r.name === name) || { name, amount: "" });
+  const next = open.filter((x) => x !== s && x.status === "pending").sort((a, b) => a.start - b.start)[0];
+  const isNow = s === current;
+  const running = s.status === "in_progress" && !s.hands_on;
+  const length = `About ${hours(s.minutes)}${s.hands_on ? "" : ", hands-free"}`;
+  let status = null;
+  if (running) {
+    status = h("p", { class: "countdown" }, h("span", { "data-until": stateAt + s.end * 60000, "data-clock": "" }), h("small", {}, "to go"));
+  } else if (s.status === "done") {
+    status = h("p", { class: "then" }, "Done.");
+  } else if (!isNow && s.start > 0) {
+    status = h("p", { class: "then" }, "Starts ", h("span", { "data-until": stateAt + s.start * 60000, "data-in": "" }), ".");
+  }
+  return [
+    h("div", { class: "head" },
+      h("div", { class: "row" }, h("p", { class: "kicker" }, `Step ${stepNumber(s, steps)} · ${length}`),
+        !isNow && current && h("button", { class: "back", onclick: () => { viewing = null; render(); } }, `Back to step ${stepNumber(current, steps)}`)),
+      h("h1", {}, s.title)),
+    h("p", { class: "instruction" }, s.text),
+    uses.length > 0 && h("div", { class: "needs" }, h("p", { class: "kicker" }, "You'll need"),
+      h("ul", {}, uses.map((u) => h("li", {}, u.amount && h("b", {}, u.amount), u.name)))),
+    status,
+    (isNow || running) && h("div", { class: "act" },
+      h("button", { class: "done", onclick: () => act("step", { step_id: s.id, status: "done" }) }, running ? "Done early" : "Done"),
+      next && h("p", { class: "then" }, "Next: ", h("b", {}, next.title))),
+  ];
+}
+
+// ---------- timers ----------
+function dial(t) {
+  const left = t.seconds_left, until = stateAt + left * 1000;
+  const ring = svg("circle", { class: "ring", cx: 54, cy: 54, r: R, "stroke-dasharray": CIRC, transform: "rotate(-90 54 54)",
+    "stroke-dashoffset": CIRC * (1 - Math.max(0, Math.min(1, left / (t.seconds || 1)))) });
+  // A paused dial holds its time and doesn't tick.
+  const attrs = t.paused ? { class: "dial paused" } : { class: "dial", "data-until": until, "data-total": t.seconds };
+  return h("div", attrs,
+    h("button", { class: "face", "aria-label": `${t.paused ? "Resume" : "Pause"} ${t.label}`, title: t.paused ? "Tap to resume" : "Tap to pause",
+      onclick: () => act("timer", { label: t.label, change: t.paused ? "resume" : "pause" }) },
+      svg("svg", { viewBox: "0 0 108 108", "aria-hidden": "true" }, svg("circle", { class: "track", cx: 54, cy: 54, r: R }), ring),
+      h("b", {}, clock(left))),
+    h("span", {}, t.label.replaceAll("_", " ")));
+}
+
+function renderTimers() {
+  const rung = [...rang.entries()].map(([label, r]) => h("div", { class: "dial rang" },
+    h("div", { class: "face" }, h("b", {}, "Time")),
+    h("span", {}, label.replaceAll("_", " ")),
+    h("div", { class: "ctl" },
+      h("button", { "aria-label": "One more minute", onclick: () => { rang.delete(label); act("timer_again", { label, minutes: 1 }); renderTimers(); } }, "+1 min"),
+      h("button", { class: "primary", onclick: () => {
+        rang.delete(label);
+        if (r.step_id) act("step", { step_id: r.step_id, status: "done" });
+        renderTimers();
+      } }, "Done"))));
+  const running = (state?.timers || []).map(dial);
+  $("timers").replaceChildren(...rung, ...running);
+  tick();
+}
+
+function ring(label) {
+  const step_id = (state?.timers || []).find((t) => t.label === label)?.step_id || null;
+  rang.set(label, { at: Date.now(), step_id });
+  // One soft two-note chime; Basil says what to do, so the sound only has to turn heads.
+  [[660, 0], [880, 0.18]].forEach(([freq, delay]) => {
+    const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + delay;
+    o.type = "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    o.connect(g).connect(ctx.destination); o.start(t); o.stop(t + 1);
+  });
+  renderTimers();
+}
+
+// Dials and countdowns tick in place so buttons are never rebuilt under a finger.
+function tick() {
+  const now = Date.now();
+  for (const el of document.querySelectorAll(".dial[data-until]")) {
+    const left = (el.dataset.until - now) / 1000, total = Number(el.dataset.total) || 1;
+    el.querySelector("b").textContent = clock(left);
+    el.querySelector(".ring").setAttribute("stroke-dashoffset", CIRC * (1 - Math.max(0, Math.min(1, left / total))));
+    el.classList.toggle("soon", left < 30);
+  }
+  for (const el of document.querySelectorAll("[data-until]:not(.dial)")) {
+    const s = (el.dataset.until - now) / 1000;
+    el.textContent = "in" in el.dataset ? `in ${hours(s / 60)}` : clock(s);
+  }
+}
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

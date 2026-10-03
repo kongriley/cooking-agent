@@ -1,0 +1,27 @@
+[project]
+name = "cooking-agent"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.9",
+    "anthropic>=1.11",
+    "playwright>=1.50",
+    "python-dotenv>=1",
+    "websockets>=15",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # the formatter owns line length; long prose strings are fine
+
+[tool.ruff.lint.isort]
+known-first-party = ["advisor", "images", "kitchen", "session", "shopping", "timers", "tools"]

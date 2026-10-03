@@ -1,0 +1,7 @@
+kitchen.json
+kitchen.tmp
+images.json
+__pycache__/
+step_pictures/
+.env
+.venv/
