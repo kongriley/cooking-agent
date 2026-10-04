@@ -4,180 +4,183 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Basil</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23f0692c'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23c8553d'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;800;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&display=swap">
 <style>
-  /* The poster: no app on screen, just what to do, as big as the screen allows, to read from across the kitchen.
-     You talk to change it. Each cook gets their own poster side by side, in the colour of the dish they're on;
-     timers run along the bottom edge; a timer that goes off takes the whole screen. The last line says what you
-     can say. */
+  /* The poster: no app on screen, just what to do, set as large as the screen allows so it reads from across the
+     kitchen. You talk to change it. Each cook gets a poster in the colour of the dish they're on; timers sit in a
+     quiet rail beneath; a timer that goes off takes the whole screen. The last line is the voice: whether Basil is
+     listening, then what you can say, or what's being said. */
   :root {
-    --bg: #efe9df; --ink: #15130f; --muted: color-mix(in srgb, var(--ink) 55%, transparent);
-    --d0: #f0692c; --d1: #2f6fd6; --d2: #f2c230; --d3: #d63a63; --d4: #8a5cdc; --d5: #17a2a0; --d6: #f3a3c0; --d7: #a06c42;
-    --alarm: #ee3d2c; --go: #2f8f5b;
-    --display: "Inter Tight", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
-    --top: #fffaf2; --line: #e2d9ca; --line-2: #cfc2ad; --flame: #2f6fd6; --hot: #f0692c;
+    --paper: #f4efe6; --ink: #1b1712; --rule: color-mix(in srgb, var(--ink) 14%, transparent); --soft: color-mix(in srgb, var(--ink) 55%, transparent);
+    --d0: #c8553d; --d1: #2e4a7d; --d2: #d9a23b; --d3: #7d3c5a; --d4: #8fa57f; --d5: #2f6f6a; --d6: #e2a593; --d7: #6b4a35;
+    --alarm: #ff5a3c; --cream: #f7f1e6;
+    --serif: "Instrument Serif", "Iowan Old Style", Georgia, serif; --sans: "Inter Tight", system-ui, sans-serif;
+    /* For core.js's drawers. */
+    --bg: var(--paper); --top: #fbf8f2; --line: var(--rule); --line-2: color-mix(in srgb, var(--ink) 24%, transparent); --muted: var(--soft);
+    --display: var(--sans); --mono: var(--sans); --flame: var(--d1); --hot: var(--d0);
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --bg: #0f0f10; --ink: #f3efe7; --top: #1c1c1f; --line: #2a2a2e; --line-2: #3a3a40; color-scheme: dark; }
+    :root:not([data-theme="light"]) { --paper: #141311; --ink: #eee7da; --top: #1d1b18; color-scheme: dark; }
   }
-  :root[data-theme="dark"] { --bg: #0f0f10; --ink: #f3efe7; --top: #1c1c1f; --line: #2a2a2e; --line-2: #3a3a40; color-scheme: dark; }
+  :root[data-theme="dark"] { --paper: #141311; --ink: #eee7da; --top: #1d1b18; color-scheme: dark; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { background: var(--bg); color: var(--ink); font-family: var(--display); overflow: hidden; display: flex; flex-direction: column; user-select: none; }
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); overflow: hidden; display: flex; flex-direction: column; user-select: none;
+    -webkit-font-smoothing: antialiased; }
   button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
   [hidden] { display: none !important; }
+  .caps { font: 500 clamp(11px, .95vw, 14px)/1.3 var(--sans); letter-spacing: .16em; text-transform: uppercase; }
 
   /* ---------- posters ---------- */
   #posters { flex: 1; min-height: 0; display: flex; }
-  .poster { --fg: #15130f; position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; padding: clamp(20px, 3vw, 48px);
-    background: var(--field, var(--bg)); color: var(--fg); transition: background .5s, flex-grow .5s; overflow: hidden; }
-  .poster.light { --fg: #15130f; }
-  .poster.dark { --fg: #fffaf2; }
-  .poster.plain { --field: var(--bg); --fg: var(--ink); }
-  .poster.main { flex-grow: 1.6; }
-  .poster + .poster { box-shadow: inset 3px 0 0 rgb(0 0 0 / .12); }
-  .poster.enter .t, .poster.enter .say-it { animation: in .5s cubic-bezier(.2, .9, .25, 1) both; }
-  .poster.enter .say-it { animation-delay: .08s; }
-  @keyframes in { from { transform: translateY(4vh); opacity: 0; } }
-  .label { font: 700 clamp(12px, 1.1vw, 17px)/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; opacity: .72; display: flex; gap: 1.2em; flex-wrap: wrap; }
-  .label b { opacity: 1; font-weight: 700; }
-  /* The title is set as large as fits: see fit() below. */
-  .t { margin: .25em 0 0; font-weight: 900; line-height: .88; letter-spacing: -.045em; text-wrap: balance; font-size: 120px; }
-  .say-it { margin: auto 0 0; display: grid; gap: .3em; max-width: 34ch; font-weight: 600; font-size: var(--body, 30px); line-height: 1.18; letter-spacing: -.015em; text-wrap: pretty; }
+  .poster { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; padding: clamp(24px, 3.6vw, 64px);
+    background: var(--field, var(--paper)); color: var(--fg, var(--ink)); transition: background-color .8s ease, flex-grow .6s ease; overflow: hidden; }
+  .poster.on-light { --fg: #1b1712; }
+  .poster.on-dark { --fg: #f7f1e6; }
+  .poster.main { flex-grow: 1.55; }
+  .label { display: flex; flex-wrap: wrap; gap: .3em 1.6em; opacity: .75; }
+  .t { margin: .18em 0 0 -.04em; font: 400 120px/.9 var(--serif); letter-spacing: -.02em; text-wrap: balance; }
+  .poster.enter .t { animation: rise .7s cubic-bezier(.2, .8, .2, 1) both; }
+  .poster.enter .body { animation: rise .7s .08s cubic-bezier(.2, .8, .2, 1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+  .body { margin-top: auto; display: grid; gap: 1em; max-width: 30ch; font-size: var(--body, 28px); }
+  .say-it { display: grid; gap: .35em; font: 400 1em/1.28 var(--sans); letter-spacing: -.01em; text-wrap: pretty; }
   .say-it p { margin: 0; }
-  .say-it .cue { opacity: .62; }
-  .say-it b { font-weight: 800; }
-  .uses { margin: .9em 0 0; font: 500 clamp(13px, 1.15vw, 18px)/1.4 var(--mono); opacity: .72; }
+  .say-it b { font-weight: 600; }
+  .say-it .cue { font-family: var(--serif); font-style: italic; font-size: 1.12em; line-height: 1.2; opacity: .8; }
+  .uses { margin: 0; opacity: .7; max-width: 60ch; }
   .uses .out { text-decoration: line-through; }
-  .big-time { font: 700 var(--clock, 64px)/1 var(--mono); letter-spacing: -.04em; font-variant-numeric: tabular-nums; margin-top: .3em; }
-  .big-time small { font-size: .3em; letter-spacing: .04em; opacity: .7; margin-left: .4em; }
-  .tap { position: absolute; right: clamp(20px, 3vw, 48px); bottom: clamp(16px, 2.4vw, 36px); font: 700 clamp(12px, 1vw, 15px) var(--mono); letter-spacing: .08em;
-    text-transform: uppercase; opacity: .55; padding: 8px 0; }
+  .when { font: italic 400 var(--clock, 64px)/1 var(--serif); margin-top: .15em; }
+  .tap { position: absolute; right: clamp(24px, 3.6vw, 64px); bottom: clamp(24px, 3.6vw, 64px); opacity: .55; padding: 6px 0; border-bottom: 1px solid currentColor; }
   .tap:hover { opacity: 1; }
-  .poster.alarm { background: var(--alarm); --fg: #fff; animation: flash 1s steps(1) infinite; }
-  @keyframes flash { 50% { background: #c92a1c; } }
-  .hello .t { font-weight: 900; }
+  /* Time's up: the poster goes dark and the words turn vermilion. */
+  .poster.alarm { background: #15120f; color: var(--alarm); }
+  .poster.alarm::after { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; animation: breathe 1.6s ease-in-out infinite; pointer-events: none; }
+  @keyframes breathe { 50% { opacity: .1; } }
+  .hello .t { font-size: 140px; }
+  .hello .t.working { font-style: italic; opacity: .55; animation: dim 1.8s ease-in-out infinite; }
+  @keyframes dim { 50% { opacity: .3; } }
 
-  /* ---------- timers: bands along the bottom edge ---------- */
-  #bands { display: flex; flex-direction: column; }
-  .band { --h: clamp(40px, 6vh, 64px); position: relative; height: var(--h); display: flex; align-items: center; gap: 1em; padding: 0 clamp(20px, 3vw, 48px);
-    background: color-mix(in srgb, var(--field) 28%, #fffaf2); color: #15130f; font: 700 clamp(15px, 1.5vw, 24px) var(--mono); letter-spacing: .02em; overflow: hidden; }
-  .band .fill { position: absolute; inset: 0 auto 0 0; width: calc(var(--left) * 100%); background: var(--field); transition: width 1s linear; }
-  .band span { position: relative; text-transform: uppercase; }
-  .band .clock { margin-left: auto; font-size: 1.35em; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-  .band.rung { background: var(--alarm); color: #fff; animation: flash-band 1s steps(1) infinite; }
-  @keyframes flash-band { 50% { background: #ff6a3d; } }
-  /* The voice line: whether Basil's listening, then what you can say, or what's being said. */
-  #voice { display: flex; align-items: center; gap: clamp(14px, 2vw, 32px); min-height: clamp(64px, 8vh, 92px); padding: 10px clamp(20px, 3vw, 48px) max(10px, env(safe-area-inset-bottom));
-    background: #111; color: #f3efe7; }
-  #state { flex: none; display: flex; align-items: center; gap: .7em; font: 700 clamp(12px, 1.05vw, 15px) var(--mono); letter-spacing: .08em; text-transform: uppercase; }
-  #state::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: #555; }
-  #state[data-mode="listening"]::before, #state[data-mode="ready"]::before { background: #5be08d; }
-  #state[data-mode="you"]::before { background: #5be08d; animation: pulse .6s ease-in-out infinite alternate; }
-  #state[data-mode="thinking"]::before { background: #f2c230; animation: pulse .4s ease-in-out infinite alternate; }
-  #state[data-mode="talking"]::before { background: #fff; animation: pulse .3s ease-in-out infinite alternate; }
-  #state[data-mode="off"]::before { background: var(--alarm); }
-  @keyframes pulse { to { transform: scale(1.5); } }
-  #line { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: .3em 1.4em; font: 600 clamp(15px, 1.35vw, 20px) var(--display); }
-  #line .hint { opacity: .55; font-weight: 500; }
-  #line q { quotes: "“" "”"; font-weight: 800; }
-  #line .you { flex-basis: 100%; opacity: .6; font-weight: 500; font-size: .85em; }
-  #line .basil { flex-basis: 100%; font-size: clamp(19px, 1.9vw, 30px); line-height: 1.22; letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  #line i { font-style: normal; animation: fade .2s ease-out; }
+  /* ---------- the rail: timers, then the voice ---------- */
+  footer { flex: none; background: var(--paper); }
+  #timers { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); border-bottom: 1px solid var(--rule); }
+  #timers:empty { display: none; }
+  .timer { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 1em; padding: 18px clamp(24px, 3.6vw, 64px) 16px; min-width: 0; }
+  .timer + .timer { border-left: 1px solid var(--rule); }
+  .timer::before { content: ""; position: absolute; left: 0; top: 0; height: 3px; width: calc(var(--left) * 100%); background: var(--field); transition: width 1s linear; }
+  .timer .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: .8em; }
+  .timer .what::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--field); }
+  .timer .clock { font: 400 clamp(28px, 2.6vw, 44px)/1 var(--serif); font-variant-numeric: tabular-nums; }
+  .timer.rung { color: var(--alarm); }
+  .timer.rung .clock { animation: dim 1s ease-in-out infinite; }
+  #voice { display: flex; align-items: center; gap: clamp(16px, 2.4vw, 40px); min-height: clamp(64px, 8.5vh, 96px); padding: 12px clamp(24px, 3.6vw, 64px) max(12px, env(safe-area-inset-bottom)); }
+  .mark { flex: none; font: italic 400 clamp(24px, 2vw, 32px)/1 var(--serif); letter-spacing: -.01em; display: flex; align-items: center; gap: .45em; }
+  /* Basil's light: still when asleep, steady when listening, quick when talking. */
+  #light { width: 10px; height: 10px; border-radius: 50%; background: var(--soft); opacity: .5; transition: background .3s, opacity .3s; }
+  #light[data-mode="listening"], #light[data-mode="ready"] { background: var(--d4); opacity: 1; }
+  #light[data-mode="you"] { background: var(--d4); opacity: 1; animation: pulse .7s ease-in-out infinite alternate; }
+  #light[data-mode="thinking"] { background: var(--d2); opacity: 1; animation: pulse 1s ease-in-out infinite alternate; }
+  #light[data-mode="talking"] { background: var(--ink); opacity: 1; animation: pulse .35s ease-in-out infinite alternate; }
+  #light[data-mode="off"] { background: var(--alarm); opacity: 1; }
+  @keyframes pulse { to { transform: scale(1.7); opacity: .6; } }
+  #line { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: .2em 1.4em; }
+  #line .hint { color: var(--soft); }
+  #line q { quotes: "“" "”"; font: italic 400 clamp(20px, 1.7vw, 28px)/1.2 var(--serif); }
+  #line .you { flex-basis: 100%; color: var(--soft); font-size: clamp(14px, 1.1vw, 17px); }
+  #line .basil { flex-basis: 100%; font: 400 clamp(20px, 1.8vw, 30px)/1.25 var(--sans); letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #line i { font-style: normal; animation: fade .25s ease-out; }
   @keyframes fade { from { opacity: 0; } }
-  #more { flex: none; display: flex; gap: 6px; }
-  #more button { padding: 8px 12px; border-radius: 8px; font: 700 clamp(12px, 1.05vw, 15px) var(--mono); letter-spacing: .08em; text-transform: uppercase; opacity: .6; }
-  #more button:hover { opacity: 1; background: rgb(255 255 255 / .08); }
-  .mark { font: 900 clamp(18px, 1.6vw, 24px) var(--display); letter-spacing: -.04em; }
-
-  /* The drawers (plan, kitchen) from core.js. */
-  #b-sheet, #b-toast { font-family: var(--display); }
+  #more { flex: none; display: flex; gap: clamp(14px, 1.6vw, 28px); }
+  #more button { color: var(--soft); padding: 6px 0; }
+  #more button:hover, #more button[aria-expanded="true"] { color: var(--ink); }
+  #b-sheet h2 { font: 400 40px var(--serif); letter-spacing: -.01em; }
 
   @media (max-width: 760px) {
     #posters { flex-direction: column; }
-    .poster + .poster { box-shadow: inset 0 3px 0 rgb(0 0 0 / .12); }
-    .poster:not(.main) { flex: 0 0 auto; padding-block: 16px; }
-    .poster:not(.main) .say-it, .poster:not(.main) .uses, .poster:not(.main) .big-time { display: none; }
+    .poster:not(.main) { flex: 0 0 auto; padding-block: 18px; }
+    .poster:not(.main) .body, .poster:not(.main) .tap { display: none; }
+    #timers { grid-auto-flow: row; }
+    .timer + .timer { border-left: 0; border-top: 1px solid var(--rule); }
+    #line q:nth-of-type(n+3) { display: none; }
   }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <main id="posters" aria-live="polite"></main>
-<div id="bands"></div>
-<div id="voice">
-  <span class="mark">basil</span>
-  <span id="state" data-mode="asleep">asleep</span>
-  <div id="line" aria-live="polite"></div>
-  <span id="more"></span>
-</div>
+<footer>
+  <div id="timers"></div>
+  <div id="voice">
+    <span class="mark"><i id="light" data-mode="asleep"></i>basil</span>
+    <div id="line" class="caps-free" aria-live="polite"></div>
+    <span id="more" class="caps"></span>
+  </div>
+</footer>
 
 <script src="/core.js"></script>
 <script>
 // Ink that reads on each dish's field.
-const LIGHT_FIELDS = new Set([2, 6]);
-const fieldOf = (dish) => ({ field: `var(--d${dishIndex(dish)})`, tone: LIGHT_FIELDS.has(dishIndex(dish)) ? "light" : "dark" });
+const LIGHT_FIELDS = new Set([2, 4, 6]);
+const fieldOf = (dish) => ({ field: `var(--d${dishIndex(dish)})`, on: LIGHT_FIELDS.has(dishIndex(dish)) ? "on-light" : "on-dark" });
 
-// The title as large as the poster allows: the biggest size where it fits the width, in at most `lines` lines and
-// `share` of the height.
-function fit(el, box, lines = 3, share = 0.5) {
-  const width = box.clientWidth - parseFloat(getComputedStyle(box).paddingLeft) * 2;
-  const maxH = box.clientHeight * share;
-  let lo = 24, hi = 340;
+// The title as large as the poster allows: the biggest size where no word overflows the width, it takes at most
+// `lines` lines, and it fills at most `share` of the height.
+const measurer = document.createElement("span");
+function fit(el, box, lines, share, most = 380) {
+  const cs = getComputedStyle(box), width = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const maxH = box.clientHeight * share, words = el.textContent.split(/\s+/);
+  measurer.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap";
+  document.body.append(measurer);
+  let lo = 28, hi = most;
   while (hi - lo > 2) {
     const mid = (lo + hi) / 2;
-    el.style.fontSize = `${mid}px`;
-    const lh = mid * 0.88;
-    const ok = el.scrollWidth <= width + 1 && el.offsetHeight <= Math.min(maxH, lh * lines + 2) && !longestWordTooWide(el, width);
-    if (ok) lo = mid; else hi = mid;
+    el.style.fontSize = measurer.style.fontSize = `${mid}px`;
+    measurer.style.font = getComputedStyle(el).font;
+    const wordsFit = words.every((w) => { measurer.textContent = w; return measurer.offsetWidth <= width; });
+    if (wordsFit && el.offsetHeight <= Math.min(maxH, mid * 0.9 * lines + 4)) lo = mid; else hi = mid;
   }
+  measurer.remove();
   el.style.fontSize = `${lo}px`;
   return lo;
-}
-const measurer = document.createElement("span");
-function longestWordTooWide(el, width) {
-  measurer.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${getComputedStyle(el).font};letter-spacing:${getComputedStyle(el).letterSpacing}`;
-  document.body.append(measurer);
-  const words = el.textContent.split(/\s+/);
-  const too = words.some((w) => { measurer.textContent = w; return measurer.offsetWidth > width; });
-  measurer.remove();
-  return too;
 }
 
 function poster(o, main, enter) {
   const a = objectiveAction(o);
+  const cls = (...c) => ["poster", ...c, main && "main", enter && "enter"].filter(Boolean).join(" ");
   if (o.kind === "eat") {
-    return h("section", { class: `poster dark${enter ? " enter" : ""}`, style: "--field: var(--go)" },
-      h("div", { class: "label" }, h("b", {}, "Served")), h("h1", { class: "t" }, "Dinner's up."),
-      h("div", { class: "say-it" }, h("p", {}, "Everything's done. Go eat.")));
+    return h("section", { class: cls("on-light"), style: "--field: var(--d4)" },
+      h("div", { class: "label caps" }, h("span", {}, "Served")), h("h1", { class: "t" }, "Dinner's up."),
+      h("div", { class: "body" }, h("div", { class: "say-it" }, h("p", {}, "Everything's done. Go and eat."))));
   }
   const st = o.s;
-  const { field, tone } = st ? fieldOf(st.dish) : { field: "var(--alarm)", tone: "dark" };
+  const { field, on } = st ? fieldOf(st.dish) : { field: "var(--alarm)", on: "on-dark" };
   const who = o.cook != null && state.cooks.length > 1 ? state.cooks[o.cook] : o.anyone ? "Anyone" : null;
   const total = st ? state.steps.filter((x) => x.dish === st.dish).length : 0;
   const items = st ? stepUses(st) : [];
-  return h("section", { class: `poster ${tone}${main ? " main" : ""}${o.kind === "rang" ? " alarm" : ""}${enter ? " enter" : ""}`, style: `--field: ${field}` },
-    h("div", { class: "label" },
-      o.kind === "rang" && h("b", {}, "Time's up"),
-      who && h("b", {}, who),
+  return h("section", { class: cls(on, o.kind === "rang" && "alarm"), style: `--field: ${field}` },
+    h("div", { class: "label caps" },
+      o.kind === "rang" && h("span", {}, "Time's up"),
+      who && h("span", {}, who),
       st && h("span", {}, st.dish),
-      total > 1 && h("span", {}, `${stepNumber(st)} / ${total}`),
-      o.viewing && h("span", {}, "looking ahead")),
+      total > 1 && h("span", {}, `${stepNumber(st)} of ${total}`),
+      o.viewing && h("span", {}, "Looking ahead")),
     h("h1", { class: "t" }, st ? st.title : words(o.label)),
-    o.waiting && h("div", { class: "big-time" }, h("span", { "data-until": stateAt + st.start * 60000, "data-in": "" }, `in ${hours(st.start)}`)),
-    st && !sameWords(st.title, st.text) && instructionLines(st.text, "say-it"),
-    items.length > 0 && h("p", { class: "uses" }, items.flatMap((u, i) => [i ? "  ·  " : null, h("span", { class: u.out ? "out" : false }, [u.amount, u.name].filter(Boolean).join(" "))])),
-    a && h("button", { class: "tap", onclick: () => a.run() }, `${a.label} ⏎`));
+    o.waiting && h("div", { class: "when", "data-until": stateAt + st.start * 60000, "data-in": "" }, `in ${hours(st.start)}`),
+    h("div", { class: "body" },
+      st && !sameWords(st.title, st.text) && instructionLines(st.text, "say-it"),
+      items.length > 0 && h("p", { class: "uses caps" }, items.flatMap((u, i) => [i ? "   ·   " : null, h("span", { class: u.out ? "out" : false }, [u.amount, u.name].filter(Boolean).join(" "))]))),
+    a && h("button", { class: "tap caps", onclick: () => a.run() }, a.label));
 }
 function helloPoster() {
   const working = !!busyWith;
-  return h("section", { class: "poster plain hello" },
-    h("h1", { class: "t", "data-busy": working ? "" : null }, working ? busyText() : hello()),
-    h("div", { class: "say-it" }, h("p", {}, working ? "Basil's working it out." : ws ? "Say what you're making, who's eating, and when." : "Press space, or tap anywhere, and say what you're making.")));
+  return h("section", { class: "poster hello" },
+    h("div", { class: "label caps" }, h("span", {}, new Date().toLocaleDateString([], { weekday: "long" }))),
+    h("h1", { class: `t${working ? " working" : ""}`, "data-busy": working ? "" : null }, working ? busyText() : hello()),
+    h("div", { class: "body" }, h("div", { class: "say-it" }, h("p", {}, working ? "Basil's working it out." : "Tell Basil what you're making, who's eating, and when."))));
 }
 
 let lastKeys = "";
@@ -189,28 +192,29 @@ function drawPosters() {
   const keys = shown.map((o) => o.key).join("|");
   const enter = !reduced() && keys !== lastKeys;
   lastKeys = keys;
-  const els = shown.length ? shown.map((o, i) => poster(o, i === 0 && shown.length > 1, enter)) : [helloPoster()];
-  $("posters").replaceChildren(...els);
+  $("posters").replaceChildren(...(shown.length ? shown.map((o, i) => poster(o, i === 0 && shown.length > 1, enter)) : [helloPoster()]));
   requestAnimationFrame(() => {
-    for (const p of $("posters").children) {
-      const t = p.querySelector(".t");
-      const size = fit(t, p, p.classList.contains("hello") ? 4 : 3, p.querySelector(".say-it") ? (p.querySelector(".big-time") ? 0.36 : 0.46) : 0.7);
-      p.style.setProperty("--body", `${Math.max(17, Math.min(40, size * 0.32))}px`);
-      p.style.setProperty("--clock", `${Math.max(28, Math.min(120, size * 0.6))}px`);
+    // The others first, so the main poster fits the room they leave.
+    for (const p of [...$("posters").children].sort((a, b) => a.classList.contains("main") - b.classList.contains("main"))) {
+      const hasBody = !!p.querySelector(".say-it p");
+      // Stacked on a phone, the others are a line each under the main poster.
+      const aside = matchMedia("(max-width: 760px)").matches && !p.classList.contains("main") && $("posters").children.length > 1;
+      const size = fit(p.querySelector(".t"), p, aside ? 1 : 3, hasBody ? 0.44 : 0.66, aside ? 44 : 380);
+      p.style.setProperty("--body", `${Math.max(17, Math.min(34, size * 0.26))}px`);
+      p.style.setProperty("--clock", `${Math.max(32, Math.min(110, size * 0.55))}px`);
     }
   });
 }
 
-// Every running timer, soonest first, as a band along the bottom; the fill is the time left.
-function drawBands() {
+// Every running timer, soonest first, in the rail; the line along its top is the time left.
+function drawTimers() {
   const timers = (state.timers || []).filter((t) => t.kind !== "reminder" && !t.follows).sort((a, b) => a.seconds_left - b.seconds_left).slice(0, 4);
-  $("bands").replaceChildren(...timers.map((t) => {
+  $("timers").replaceChildren(...timers.map((t) => {
     const st = t.step_id && state.steps.find((x) => x.id === t.step_id);
-    const { field, tone } = st ? fieldOf(st.dish) : { field: "var(--ink)", tone: "dark" };
     const until = stateAt + t.seconds_left * 1000, left = Math.max(0, Math.min(1, t.seconds_left / (t.seconds || 1)));
-    return h("div", { class: `band ${tone}${left > 0.5 ? " half" : ""}${rang.has(t.label) ? " rung" : ""}`, style: `--field: ${field}; --left: ${left}`, "data-band": "", "data-until": t.paused ? "" : until, "data-total": t.seconds },
-      h("i", { class: "fill" }),
-      h("span", {}, st ? st.title : words(t.label)),
+    return h("div", { class: `timer${rang.has(t.label) ? " rung" : ""}`, style: `--field: ${st ? dishColor(st.dish) : "var(--ink)"}; --left: ${left}`,
+      "data-band": "", "data-until": t.paused ? "" : until, "data-total": t.seconds },
+      h("span", { class: "what caps" }, st ? st.title : words(t.label)),
       h("span", { class: "clock", ...(t.paused ? {} : { "data-until": until, "data-clock": "" }) }, t.paused ? `${clock(t.seconds_left)} paused` : clock(t.seconds_left)));
   }));
 }
@@ -224,30 +228,25 @@ function drawLine() {
     return;
   }
   const [o] = objectives();
-  const say = !o ? ["Salmon and rice for two at seven", "What can I make with what's in the fridge?"]
+  const say = !o ? ["Salmon and rice for two, at seven", "What can I make from the fridge?"]
     : o.kind === "rang" ? ["Done", "One more minute"] : o.kind === "eat" ? ["We're done"]
     : ["Done", "What's next?", "How long's left?", "Show me the plan"];
-  $("line").replaceChildren(h("span", { class: "hint" }, ws ? "Say" : "Press space and say"), ...say.map((q) => h("q", {}, q)));
+  $("line").replaceChildren(h("span", { class: "hint caps" }, ws ? "Say" : busyWith ? busyText() : "Press space and say"), ...say.map((q) => h("q", {}, q)));
 }
 function drawMore() {
-  $("more").replaceChildren(...navItems().map(({ view: v, label }) => h("button", { onclick: () => { sound.tap(); openSheet(sheetView === v ? "nothing" : v); } }, label)));
+  $("more").replaceChildren(...navItems().map(({ view: v, label }) =>
+    h("button", { "aria-expanded": String(sheetView === v), onclick: () => { sound.tap(); openSheet(sheetView === v ? "nothing" : v); } }, label)));
 }
 
-View.render = () => { drawBands(); drawPosters(); drawLine(); drawMore(); };
+View.render = () => { drawTimers(); drawPosters(); drawLine(); drawMore(); };
 View.tick = (now) => {
   if (!talking && !hearing && now - quietAt > 9000 && $("line").querySelector(".basil, .you")) drawLine();
   for (const el of document.querySelectorAll("[data-band]")) {
-    if (!el.dataset.until) continue;
-    const left = Math.max(0, Math.min(1, (Number(el.dataset.until) - now) / 1000 / Number(el.dataset.total)));
-    el.style.setProperty("--left", left);
-    el.classList.toggle("half", left > 0.5);
+    if (el.dataset.until) el.style.setProperty("--left", Math.max(0, Math.min(1, (Number(el.dataset.until) - now) / 1000 / Number(el.dataset.total))));
   }
 };
-const STATE_WORDS = { asleep: "asleep", ready: "hold space", listening: "listening", you: "hearing you", thinking: "thinking", talking: "talking", off: "muted" };
 View.pilot = (mode) => {
-  const el = $("state");
-  el.dataset.mode = mode;
-  el.textContent = busyWith ? busyText() : STATE_WORDS[mode] || mode;
+  $("light").dataset.mode = mode;
   if (state) drawLine();
 };
 View.said = (who, text, live) => { if (!live) quietAt = Date.now(); drawLine(); };
@@ -258,7 +257,7 @@ View.stream = (piece) => {
 };
 View.ignite = () => sound.boot();
 
-// Tap anywhere on the posters to start talking, like pressing space.
+// A tap anywhere on the posters starts talking, like pressing space.
 $("posters").addEventListener("click", (e) => { if (!e.target.closest("button") && !ws) talkPress(); });
 document.addEventListener("keydown", (e) => {
   if (e.code !== "Space" || e.repeat || pushToTalk || sheetView || e.target.matches?.("input, textarea, button, a")) return;
