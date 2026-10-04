@@ -107,8 +107,8 @@ async def process_request(connection: ServerConnection, request: Request) -> Res
             return connection.respond(HTTPStatus.NOT_FOUND, "no file\n")
         headers = Headers({"Content-Type": "image/webp", "Cache-Control": "max-age=604800"})
         return Response(HTTPStatus.OK.value, "OK", headers, file.read_bytes())
-    # /stove is another look at the same kitchen and conversation: a renderer on core.js.
-    pages = {"/": "index.html", "/stove": "stove.html", "/core.js": "core.js"}
+    # /stove and /poster are other looks at the same kitchen and conversation, each a renderer on core.js.
+    pages = {"/": "index.html", "/stove": "stove.html", "/poster": "poster.html", "/core.js": "core.js"}
     if url.path not in pages:
         return connection.respond(HTTPStatus.NOT_FOUND, "not found\n")
     response = connection.respond(HTTPStatus.OK, (HERE / pages[url.path]).read_text())
