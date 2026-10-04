@@ -63,7 +63,7 @@ stepper to set an amount, the remove control to take an item out. A swap is a re
 ("milk" is the gallon of whole milk in the cart).
 - It's one cart that gets added to and changed over time. If something asked for is already in it, don't add \
 another: set its quantity to what's asked. Never leave duplicates of the same thing.
-- Before you finish, open the cart and note everything in it with quantities.
+- Before you finish, open the cart, note everything in it with quantities, and leave it showing.
 - Never go to checkout, never enter payment or address details, never place an order. The cook does that.
 - If the site asks you to log in before you can add items, stop and report needs_login.
 - When everything is handled, call finish: what you added (with the product you chose), what you changed, what you \
@@ -467,7 +467,7 @@ class InstacartShopper:
             )
             task = f"Store: {store or 'any'}\nAdd these items:\n{wanted}" + already(known)
             report = await self._run(page, task)
-            return {**report, "cart_url": store_url(page.url)}
+            return {**report, "cart_url": store_url(page.url), "shot": await save_shot(page)}
 
     async def shop_site(self, site: str, items: list[dict], note: str | None, known: list[str] = ()) -> dict:
         """Add `items` to the cart of any store's website (not Instacart). The cart lives in the shopping browser, so
@@ -504,7 +504,7 @@ class InstacartShopper:
             report = await self._run(page, task, SITE_PROMPT if site else SYSTEM_PROMPT)
             if site:
                 return {**report, "cart_url": page.url, "shot": await save_shot(page)}
-            return {**report, "cart_url": store_url(page.url)}
+            return {**report, "cart_url": store_url(page.url), "shot": await save_shot(page)}
 
     async def _page(self, browser: Browser, start: str = CART_URL) -> Page:
         context = browser.contexts[0]

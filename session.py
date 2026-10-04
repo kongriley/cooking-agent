@@ -37,6 +37,9 @@ PRONUNCIATIONS = {
 BOOSTED_KEYWORDS = [
     "Basil", "mise en place", "julienne", "chiffonade", "brunoise", "crème fraîche", "beurre blanc", "roux",
     "deglaze", "sous vide", "gochujang", "za'atar",
+    # the demo menu: a Lyon bouchon dinner
+    "frisée", "lardons", "poached egg", "chicken with vinegar", "potato gratin", "apple tart", "crème fraîche",
+    "Murray's",
 ]  # fmt: skip
 
 
@@ -68,7 +71,8 @@ LATER = Urgency(quiet=4, patience=300)
 # How often to check whether a step's start time has come.
 DUE_CHECK_SECONDS = 10
 # A Phonic conversation keeps every turn and tool result, so a long cook makes it slow and costly. After this many turns
-# from the cook, the next real pause starts a fresh one, briefed with the recap. 0 never does.
+# from the cook, the next real pause soft-resets it in place (Phonic's `reset`: same connection, so no audio is lost),
+# briefed with the recap. 0 never does.
 FRESH_AFTER_TURNS = 5
 # What counts as a real pause: nobody talking for this long, nothing running, nothing waiting to be said.
 FRESH_QUIET_SECONDS = 8
@@ -111,7 +115,8 @@ class Session:
         self.last_user_speech = 0.0
         self.turns = 0  # what the cook has said in this conversation
         self.announcing = False  # an unprompted line is waiting for its gap or being said
-        self.fresh_due = asyncio.Event()  # time for a fresh conversation
+        self.config: dict = {}  # what the conversation was started with, for a reset to start again from
+        self.base_prompt = ""  # the system prompt without the recap
         # Lines Basil says unprompted (timers, reminders, steps coming due), one at a time, each when there's a gap.
         self.announcements: asyncio.Queue[tuple[str, Urgency]] = asyncio.Queue()
 
@@ -184,21 +189,27 @@ class Session:
             self.announcing = False
 
     async def watch_for_a_fresh_start(self, after_turns: int, check_seconds: float = 2) -> None:
-        """Once the conversation is long, ask for a fresh one at the next real pause, never mid-exchange, mid-alert,
-        mid-tool or while the cart is filling (that job lives with this conversation)."""
+        """Once the conversation is long, clear its memory at the next real pause (never mid-exchange, mid-alert or
+        mid-tool), briefed with the recap. Phonic's `reset` does it on the same connection, so the audio keeps flowing
+        and nothing the cook says is lost."""
         while after_turns:
             await asyncio.sleep(check_seconds)
-            cart = self.toolbox.cart_job
             if (
                 self.turns >= after_turns
                 and not self.busy(FRESH_QUIET_SECONDS)
                 and not self.announcing
                 and self.announcements.empty()
-                and (cart is None or cart.done())
             ):
-                logging.info(f"{self.turns} turns in: starting a fresh conversation")
-                self.fresh_due.set()
-                return
+                logging.info(f"{self.turns} turns in: resetting the conversation's memory")
+                await self.reset()
+
+    async def reset(self) -> None:
+        recap = self.toolbox.recap()
+        config = {k: v for k, v in self.config.items() if k != "type"}
+        config["system_prompt"] = self.base_prompt + (f"\n\n{recap}" if recap else "")
+        config["generate_welcome_message"] = False  # picks up where things are, silently
+        self.turns = 0
+        await self.send({"type": "reset", "config": config})
 
     async def watch_the_clock(self) -> None:
         """Speak up when a step's start time comes, the way a host with a plan does: 'Sam, start the beans.'"""
@@ -279,7 +290,7 @@ class Session:
         self.last_assistant_activity = time.monotonic()
         name, parameters = call["tool_name"], call["parameters"] or {}
         # Lets the screen show work in progress (a consult can take half a minute).
-        await self.on_event({"type": "tool_started", "tool_name": name})
+        await self.on_event({"type": "tool_started", "tool_name": name, "parameters": parameters})
         self.tools_running += 1
         try:
             output = await self.toolbox.call(name, parameters)
@@ -422,6 +433,11 @@ async def open_session(
         "websocket_timeout_sec": 300,
         "pronunciation_dictionary": [{"word": w, "pronunciation": say} for w, say in PRONUNCIATIONS.items()],
         "boosted_keywords": BOOSTED_KEYWORDS,
+        # He's from Lyon, and he gets by in Spanish: ask ("can we do this in French?") and he switches, fully; a stray
+        # word in either doesn't.
+        "default_language": "en",
+        "additional_languages": ["fr", "es"],
+        "multilingual_mode": "request",
     }
     headers = {"Authorization": f"Bearer {os.environ['PHONIC_API_KEY']}"}
     url = f"{api_base}/v1/sts/ws"
@@ -449,6 +465,7 @@ async def open_session(
             config["generate_welcome_message"] = False
         if recap and not quiet:
             session.resume_instruction = RESUME_INSTRUCTION
+        session.config, session.base_prompt = config, prompt
         await session.send(config)
         timers.restore()
         receiving = asyncio.create_task(session.receive())

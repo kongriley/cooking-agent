@@ -1016,44 +1016,62 @@ def test_the_ingredient_list_can_be_edited_by_hand_or_by_voice(tmp_path):
     assert "Say nothing" in note["system_message"]
 
 
-def test_a_long_conversation_starts_fresh_only_at_a_real_pause():
+def test_a_long_conversation_resets_its_memory_only_at_a_real_pause():
     import session as session_module
     from session import Session
 
     async def ignore(_: dict) -> None:
         pass
 
+    class Socket:
+        def __init__(self) -> None:
+            self.sent: list[dict] = []
+
+        async def send(self, raw: str) -> None:
+            self.sent.append(json.loads(raw))
+
     class Stub:
         cart_job = None
 
-    async def scenario() -> list[bool]:
-        session = Session(socket=None, on_event=ignore)
+        def recap(self) -> str:
+            return "## Where things stand"
+
+    async def scenario() -> tuple[list[int], Socket, Session]:
+        socket = Socket()
+        session = Session(socket=socket, on_event=ignore)
         session.toolbox = Stub()
+        session.config, session.base_prompt = {"type": "config", "voice_id": "jerome"}, "You are Basil."
         session_module.FRESH_QUIET_SECONDS = 0.05
         watcher = asyncio.create_task(session.watch_for_a_fresh_start(after_turns=3, check_seconds=0.02))
+        resets = lambda: sum(m["type"] == "reset" for m in socket.sent)  # noqa: E731
         seen = []
         session.turns = 2  # not long yet
         await asyncio.sleep(0.15)
-        seen.append(session.fresh_due.is_set())
+        seen.append(resets())
         session.turns = 3
         session.user_speaking = True  # mid-sentence: wait
         await asyncio.sleep(0.15)
-        seen.append(session.fresh_due.is_set())
+        seen.append(resets())
         session.user_speaking = False
         session.announcing = True  # a timer alert is waiting to be said: wait
         await asyncio.sleep(0.15)
-        seen.append(session.fresh_due.is_set())
+        seen.append(resets())
         session.announcing = False
         await asyncio.sleep(0.2)
-        seen.append(session.fresh_due.is_set())
+        seen.append(resets())
         watcher.cancel()
-        return seen
+        return seen, socket, session
 
     original = session_module.FRESH_QUIET_SECONDS
     try:
-        assert asyncio.run(scenario()) == [False, False, False, True]
+        seen, socket, session = asyncio.run(scenario())
     finally:
         session_module.FRESH_QUIET_SECONDS = original
+    assert seen == [0, 0, 0, 1]
+    reset = next(m for m in socket.sent if m["type"] == "reset")
+    assert reset["config"]["system_prompt"] == "You are Basil.\n\n## Where things stand"
+    assert reset["config"]["generate_welcome_message"] is False and "type" not in reset["config"]
+    assert session.turns == 0  # counting starts again
 
 
 def test_a_tool_name_said_out_loud_is_flagged_in_the_log(tmp_path, caplog):
@@ -1466,3 +1484,80 @@ def test_the_screen_shows_one_cart_per_store_not_one_per_run(tmp_path):
     assert toolbox._known("dartagnan.com") == ["chicken: 1"] and toolbox._known("Whole Foods") == []
     toolbox.clear_carts(store="dartagnan.com")
     assert [o["store"] for o in toolbox.kitchen.orders] == ["Safeway"]
+
+
+def test_basil_switches_to_french_only_when_asked():
+    import inspect
+
+    import session
+
+    source = inspect.getsource(session.open_session)
+    assert '"additional_languages": ["fr", "es"]' in source and '"multilingual_mode": "request"' in source
+
+
+def test_after_enough_turns_the_conversation_resets_on_the_same_connection(tmp_path, monkeypatch):
+    import types
+
+    import websockets
+    from websockets.asyncio.server import serve
+
+    import server
+    import session as session_module
+
+    monkeypatch.setenv("PHONIC_API_KEY", "ph_test")
+    monkeypatch.setattr(session_module, "FRESH_QUIET_SECONDS", 0.05)
+    monkeypatch.setattr(server, "instacart", lambda args: None)
+    monkeypatch.setattr(server, "advisor", lambda: None)
+    connections: list[list[dict]] = []
+
+    async def fake_phonic(ws) -> None:
+        # Each connection is one Phonic conversation: take the config, then the cook says five things.
+        received = [json.loads(await ws.recv())]
+        connections.append(received)
+        await ws.send(json.dumps({"type": "conversation_created"}))
+        for n in range(5):
+            await ws.send(json.dumps({"type": "input_text", "text": f"line {n}"}))
+        try:
+            async for raw in ws:
+                received.append(json.loads(raw))
+        except websockets.ConnectionClosed:
+            pass
+
+    class Browser:  # the tab: stays open and quiet
+        request = types.SimpleNamespace(path="/ws")
+        state = types.SimpleNamespace(name="OPEN")
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            await asyncio.sleep(3600)
+
+        async def send(self, raw: str) -> None:
+            pass
+
+    def resets() -> list[dict]:
+        return [m for conn in connections for m in conn if m.get("type") == "reset"]
+
+    async def scenario() -> None:
+        async with serve(fake_phonic, "127.0.0.1", 0) as phonic:
+            port = phonic.sockets[0].getsockname()[1]
+            args = types.SimpleNamespace(
+                voice="jerome",
+                speed=1.0,
+                api_base=f"ws://127.0.0.1:{port}",
+                kitchen=str(tmp_path / "kitchen.json"),
+                fresh_after=5,
+            )
+            tab = asyncio.create_task(server.handle_browser(Browser(), args))
+            for _ in range(100):
+                if resets():
+                    break
+                await asyncio.sleep(0.1)
+            tab.cancel()
+
+    asyncio.run(scenario())
+    assert len(connections) == 1, "the conversation should reset in place, not reconnect"
+    assert resets(), "no reset after five turns"
+    reset = resets()[0]["config"]
+    assert reset["generate_welcome_message"] is False and "line 4" in reset["system_prompt"]  # briefed with the recap

@@ -19,7 +19,7 @@ allows the mic on `localhost`, so on a remote box forward the port: `ssh -L 8000
 | Flag | Default | |
 |---|---|---|
 | `--voice` / `--speed` | `jerome` / `1.15` | Phonic voice and speaking speed (0.5–1.5) |
-| `--fresh-after` | `5` | Turns before a fresh Phonic conversation, started at the next real pause and briefed with a recap; `0` never |
+| `--fresh-after` | `5` | Turns before Phonic's memory is reset in place, at the next real pause, with a recap; `0` never |
 | `--kitchen` | `kitchen.json` | Where the kitchen, plan, timers, carts and conversation persist |
 | `--instacart` | `auto` | `local`: a headless Chrome on this computer. `browser`: the Docker sandbox. `off`. `auto`: the sandbox if it's running, else local |
 | `--port`, `--host`, `--api-base` | | |
@@ -36,7 +36,7 @@ often, cook what's good this week), never a caricature. Dry, terse, a step ahead
 screen. Phonic carries the emotion from the persona and the example exchanges; French kitchen words are pronounced
 properly (`PRONUNCIATIONS` in `session.py`). The character is "Who you are" in `system_prompt.md`.
 
-**Listening.** Silence is his default. He answers when you say "Basil", answer his question, or plainly ask him
+**Listening.** English, or French or Spanish when asked. Silence is his default. He answers when you say "Basil", answer his question, or plainly ask him
 something about the cooking; cooks talking to each other get nothing (his `stay_quiet` tool). Timers, reminders and
 steps coming due always come through. *Always on* in the Kitchen sheet keeps him listening and quietly reconnecting.
 
@@ -48,7 +48,7 @@ over" all work. After an action the screen already shows, Basil says nothing; th
 burners, ovens, who's cooking, skill, diet and your Instacart store. All editable in the Kitchen sheet.
 
 **Planning.** `plan_dish` has a stronger model (Claude Opus or OpenAI) write the whole plan in about 20 seconds while
-the conversation carries on; Basil says a line first. Steps read like a chef's prep list ("Garlic in. Pale gold, 2
+the conversation carries on; Basil says a line first and the screen shows "Planning…". Steps read like a chef's prep list ("Garlic in. Pale gold, 2
 min."), with no gather-and-check busywork. The code schedules, not the model: long chains first, one hands-on step per
 cook, no more burners than you have, two things per oven, beginners get more time. Give a time to eat and the plan works
 back from it so every dish lands together; when a step's start time comes, Basil says so. The **Plan** sheet is the run
@@ -65,8 +65,8 @@ waits for a pause (a timer up to 20 seconds, a reminder up to three minutes), an
 together.
 
 **Memory.** `kitchen.json` holds the kitchen, the plan, timers, carts and the last 30 lines of conversation. A reload
-shows where things stand, and taps work without Basil. Every few turns (`--fresh-after`) the Phonic conversation is
-swapped for a fresh one, briefed with the same recap, so a long cook stays quick. **Clear all** in the Kitchen sheet
+shows where things stand, and taps work without Basil. Every few turns (`--fresh-after`) Phonic's memory is reset on
+the same connection and briefed with the same recap, so a long cook stays quick. **Clear all** in the Kitchen sheet
 starts over and keeps the kitchen.
 
 **Shopping.** A computer-use agent (`shopping.py`, Claude or OpenAI) shops in a Chrome of its own, headless, with its
@@ -94,7 +94,7 @@ docker run -d --name basil-shopper --restart unless-stopped -p 127.0.0.1:9223:92
 
 | File | What it does |
 |---|---|
-| `server.py` + `index.html` | Serves the page; bridges each tab to its Phonic conversation, swapping in fresh ones |
+| `server.py` + `index.html` | Serves the page; bridges each tab to its Phonic conversation |
 | `session.py` | One Phonic conversation: config, tools, the unprompted-speech queue, the due-step watcher |
 | `system_prompt.md` | Basil's character and principles |
 | `tools.py` | Tool schemas (with per-tool Phonic speech settings) and handlers |

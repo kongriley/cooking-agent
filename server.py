@@ -270,59 +270,38 @@ async def handle_browser(browser: ServerConnection, args: argparse.Namespace) ->
     # /ws?talk=0 is the screen alone; plain /ws is a conversation with Basil, which starts only when the cook asks.
     if urllib.parse.urlsplit(browser.request.path).query == "talk=0":
         return await handle_screen(browser, Path(args.kitchen))
-    kitchen_path = Path(args.kitchen)
-    # The Phonic conversation behind this tab. When it gets long it's swapped for a fresh one, briefed with the recap,
-    # while the tab, the mic and the screen carry on. None for the moment of the swap.
-    current: dict[str, Session | None] = {"session": None}
+    session: Session | None = None
 
     async def forward(event: dict) -> None:
         await browser.send(json.dumps(event))
-        if event["type"] in STATE_CHANGING_EVENTS and current["session"] is not None:
-            await push_state(browser, current["session"])
+        if event["type"] in STATE_CHANGING_EVENTS:
+            await push_state(browser, session)
 
     async def read_browser() -> None:
         async for raw in browser:
             message = json.loads(raw)
-            session = current["session"]
-            if session is None:
-                # Mid-swap: a tap still lands on the saved kitchen; a moment of audio is dropped.
-                if message["type"] == "action" and message["action"] != "buy_missing":
-                    toolbox = saved_toolbox(kitchen_path)
-                    await apply_action(toolbox, message)
-                    await browser.send(json.dumps({"type": "state", **toolbox.snapshot()}))
-                continue
-            try:
-                if message["type"] == "audio":
+            match message["type"]:
+                case "audio":
                     await session.send_audio(message["audio"])
-                elif message["type"] == "action":
+                case "action":
                     await handle_action(browser, session, message)
-            except ConnectionClosed:
-                if browser.state.name != "OPEN":
-                    raise  # the tab itself went away
-                # otherwise it was the old conversation closing during a swap; this message goes with it
 
     quiet = "quiet=1" in urllib.parse.urlsplit(browser.request.path).query
-    reading = asyncio.create_task(read_browser())
+    # Checking for the shopping browser makes blocking calls; off the event loop, so no one's audio stalls meanwhile.
+    shopper = await asyncio.to_thread(instacart, args)
+    session_args = (args.voice, args.speed, shopper, advisor(), args.api_base, quiet, args.fresh_after)
     try:
-        while True:
-            session_args = (args.voice, args.speed, instacart(args), advisor(), args.api_base, quiet, args.fresh_after)
-            async with open_session(kitchen_path, forward, *session_args) as session:
-                current["session"] = session
-                # Stop when either side goes away (the tab closes, or Phonic ends it), or go again for a fresh one.
-                ended = asyncio.create_task(session.ended.wait())
-                fresh = asyncio.create_task(session.fresh_due.wait())
-                await asyncio.wait([reading, ended, fresh], return_when=asyncio.FIRST_COMPLETED)
-                current["session"] = None
-                again = fresh.done() and not reading.done() and not ended.done()
-                for task in [ended, fresh]:
-                    task.cancel()
-            if not again:
-                break
-            quiet = True  # the fresh one picks up silently, without a greeting or a "where were we"
+        async with open_session(Path(args.kitchen), forward, *session_args) as session:
+            # Stop when either side goes away: the tab closes, or Phonic ends the conversation.
+            reading = asyncio.create_task(read_browser())
+            ended = asyncio.create_task(session.ended.wait())
+            await asyncio.wait([reading, ended], return_when=asyncio.FIRST_COMPLETED)
+            for task in [reading, ended]:
+                task.cancel()
+            if reading.done() and not reading.cancelled():
+                reading.result()
     except ConnectionClosed:
         pass  # the tab closed or the server is shutting down; state is saved as it changes, so nothing is lost
-    finally:
-        reading.cancel()
 
 
 async def run(args: argparse.Namespace) -> None:
@@ -367,7 +346,7 @@ def main() -> None:
         "--fresh-after",
         type=int,
         default=5,
-        help="start a fresh Phonic conversation (briefed with a recap) after this many turns, at the next pause; 0 never",
+        help="reset the Phonic conversation's memory (briefed with a recap) after this many turns, at the next pause; 0 never",
     )
     parser.add_argument("--speed", type=float, default=1.15, help="speaking speed, 0.5 to 1.5")
     parser.add_argument(

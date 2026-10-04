@@ -191,6 +191,8 @@
   .step-pic { position: relative; margin: 0; width: min(100%, 420px); aspect-ratio: 3 / 2; border-radius: 18px; overflow: hidden; background: var(--knob); }
   .step-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .step-pic.loading { animation: flicker 1.8s ease-in-out infinite; }
+  .step-pic .wait { position: absolute; inset: 0; display: grid; place-items: center; font: 500 12px var(--mono);
+    letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
   .step-pic figcaption { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: rgb(255 255 255 / .85); text-shadow: 0 1px 3px rgb(0 0 0 / .5); }
 
   /* Ingredient list, cookbook style: amount first. Only what you're missing is marked, and gathered at the top. */
@@ -242,6 +244,11 @@
   @keyframes appear { from { opacity: 0; } }
 
   #mic { display: grid; justify-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  /* Basil working on something slow (a plan, a hard question): said plainly until it lands. */
+  #busy { margin: 0; font: 500 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink);
+    animation: flicker 1.6s ease-in-out infinite; }
+  #stage > .hint.working { color: var(--ink); animation: flicker 1.6s ease-in-out infinite; }
+  #stage:has(> .hint.working) ~ * #busy, body:has(#stage > .hint.working) #busy { display: none; }
   #mic .disc { width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: var(--knob); color: var(--ink); transition: background .3s, color .3s, box-shadow .3s, transform .15s; }
   #mic svg { width: 28px; height: 28px; }
   #mic-word:empty { display: none; }
@@ -487,6 +494,7 @@
 <footer>
   <div id="timers"></div>
   <div id="voice">
+  <p id="busy" role="status" hidden></p>
   <div id="said">
     <p class="said you" hidden><span class="line"><span id="said-you"></span></span></p>
     <p class="said basil" hidden><span class="line"><span id="said-basil"></span></span></p>
@@ -566,7 +574,7 @@ async function wake(quiet = false) {
   ws.onmessage = (e) => onEvent(JSON.parse(e.data));
   ws.onclose = () => {
     // Back to asleep: the next tap starts a fresh conversation, which picks up where this one left off.
-    ws = null; talking = hearing = thinking = consulting = false; hush();
+    ws = null; talking = hearing = thinking = consulting = false; busyWith = null; hush();
     recognizer?.abort(); mic?.getTracks().forEach((t) => t.stop()); mic = null;
     pilot("asleep", closedBecause);
     refresh();
@@ -644,6 +652,17 @@ function startDictation() {
 }
 
 const SLOW_TOOLS = ["think_it_through", "plan_dish"]; // a careful chef thinking: 10-30 s
+// What Basil is busy with, shown until it lands: "Planning poulet au vinaigre…", "Thinking…".
+let busyWith = null;
+function busyLabel(tool, parameters = {}) {
+  if (tool === "plan_dish") return parameters.dish ? `Planning ${parameters.dish.toLowerCase()}…` : "Planning…";
+  return "Thinking…";
+}
+function renderBusy() {
+  $("busy").hidden = !busyWith;
+  $("busy").textContent = busyWith || "";
+  if (!plan().steps.length) render(); // on an empty screen, it takes the middle
+}
 function onEvent(m) {
   switch (m.type) {
     case "audio_chunk": play(m.audio); if (m.text) stream(m.text); break;
@@ -651,12 +670,12 @@ function onEvent(m) {
     case "tool_started":
       // A consult takes a while; say so, so a quiet Basil doesn't read as a frozen one.
       // While he's still saying his line ("Chicken. One sec."), let it finish; the mic shows the thinking either way.
-      if (SLOW_TOOLS.includes(m.tool_name)) { consulting = true; if (!talking) { said("basil", "Thinking…", false); document.querySelector(".said.basil").classList.add("pondering"); } }
+      if (SLOW_TOOLS.includes(m.tool_name)) { consulting = true; busyWith = busyLabel(m.tool_name, m.parameters); renderBusy(); }
       break;
     case "tool_result":
       if (m.tool_name === "show_on_screen" && m.output.ok) showOnScreen(m.output);
       if (m.tool_name === "set_listening" && m.output.ok) setAlwaysOn(m.output.always);
-      if (SLOW_TOOLS.includes(m.tool_name)) { consulting = false; document.querySelector(".said.basil").classList.remove("pondering"); }
+      if (SLOW_TOOLS.includes(m.tool_name)) { consulting = false; busyWith = null; renderBusy(); }
       break;
     case "assistant_started_speaking": talking = true; thinking = false; document.querySelector(".said.basil").classList.remove("pondering"); said("basil", "", true); break;
     case "assistant_finished_speaking": talking = false; live("basil", false); break;
@@ -1248,7 +1267,7 @@ function render() {
       h("div", { class: "act" }, h("button", { class: "early", onclick: () => { state.finished_at = null; state.steps = []; act("clear_finished"); render(); } }, "Done"))))];
   } else {
     const quiet = !$("said-you").textContent && !$("said-basil").textContent;
-    view = [quiet ? h("p", { class: "hint" }, hello()) : $("said")];
+    view = busyWith ? [h("p", { class: "hint working" }, busyWith)] : [quiet ? h("p", { class: "hint" }, hello()) : $("said")];
   }
   // Captions live above the mic, except when nothing is cooking and the conversation takes the middle.
   if (!view.includes($("said"))) $("voice").prepend($("said"));
@@ -1275,7 +1294,7 @@ function picture(s) {
 // Asked for as soon as the plan exists, so stepping ahead never waits on a picture or clip being made.
 function preloadPictures(steps) { steps.forEach(picture); }
 function stepPicture(s) {
-  const frame = h("figure", { class: "step-pic loading" });
+  const frame = h("figure", { class: "step-pic loading" }, h("span", { class: "wait" }, "Picturing it…"));
   picture(s).then(({ url, illustration }) => {
     if (!url) return frame.remove();
     const img = h("img", { src: url, alt: "" });
