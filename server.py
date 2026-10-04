@@ -107,11 +107,15 @@ async def process_request(connection: ServerConnection, request: Request) -> Res
             return connection.respond(HTTPStatus.NOT_FOUND, "no file\n")
         headers = Headers({"Content-Type": "image/webp", "Cache-Control": "max-age=604800"})
         return Response(HTTPStatus.OK.value, "OK", headers, file.read_bytes())
-    if request.path != "/":
+    # /stove is another look at the same kitchen and conversation: a renderer on core.js.
+    pages = {"/": "index.html", "/stove": "stove.html", "/core.js": "core.js"}
+    if url.path not in pages:
         return connection.respond(HTTPStatus.NOT_FOUND, "not found\n")
-    response = connection.respond(HTTPStatus.OK, (HERE / "index.html").read_text())
+    response = connection.respond(HTTPStatus.OK, (HERE / pages[url.path]).read_text())
     del response.headers["Content-Type"]
-    response.headers["Content-Type"] = "text/html; charset=utf-8"
+    js = url.path.endswith(".js")
+    response.headers["Content-Type"] = "text/javascript; charset=utf-8" if js else "text/html; charset=utf-8"
+    response.headers["Cache-Control"] = "no-store"
     return response
 
 

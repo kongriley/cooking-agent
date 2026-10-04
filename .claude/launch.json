@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "stove-busy", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "python3 .claude/fixture.py busy /tmp/basil-busy.json && uv run server.py --port 8036 --instacart off --kitchen /tmp/basil-busy.json"], "port": 8036 },
+    { "name": "stove-rung", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "python3 .claude/fixture.py rung /tmp/basil-rung.json && uv run server.py --port 8037 --instacart off --kitchen /tmp/basil-rung.json"], "port": 8037 },
+    { "name": "stove-empty", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "python3 .claude/fixture.py empty /tmp/basil-empty.json && uv run server.py --port 8038 --instacart off --kitchen /tmp/basil-empty.json"], "port": 8038 },
+    { "name": "stove-solo", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "python3 .claude/fixture.py solo /tmp/basil-solo.json && uv run server.py --port 8039 --instacart off --kitchen /tmp/basil-solo.json"], "port": 8039 },
+    { "name": "stove-finished", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "python3 .claude/fixture.py finished /tmp/basil-finished.json && uv run server.py --port 8040 --instacart off --kitchen /tmp/basil-finished.json"], "port": 8040 },
+    { "name": "stove-party", "runtimeExecutable": "sh", "runtimeArgs": ["-c", "python3 .claude/fixture.py party /tmp/basil-party.json && uv run server.py --port 8041 --instacart off --kitchen /tmp/basil-party.json"], "port": 8041 }
+  ]
+}
