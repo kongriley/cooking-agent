@@ -38,11 +38,13 @@ properly (`PRONUNCIATIONS` in `session.py`). The character is "Who you are" in `
 
 **Listening.** English, or French or Spanish when asked. Silence is his default. He answers when you say "Basil", answer his question, or plainly ask him
 something about the cooking; cooks talking to each other get nothing (his `stay_quiet` tool). Timers, reminders and
-steps coming due always come through. *Always on* in the Kitchen sheet keeps him listening and quietly reconnecting.
+steps coming due always come through. In the Kitchen sheet, *Always on* keeps him listening and quietly reconnecting; *Hold* is push-to-talk (hold the mic
+or Space), and then everything he hears is for him.
 
 **Voice for everything.** Anything you can tap, you can say: "thanks, got it" finishes what's in front of you (a step,
 a card, a rung timer); "go back", "show me the soup plan", "take the cream off my list", "clear the screen", "start
-over" all work. After an action the screen already shows, Basil says nothing; the screen is the confirmation.
+over" all work. "Undo" (or ⌘Z) takes back the last change to the plan, steps, timers, serve time, kitchen or
+ingredients, his or yours, up to 20 deep; carts are at real stores, so those are changed, not undone. After an action the screen already shows, Basil says nothing; the screen is the confirmation.
 
 **Your kitchen.** Basil assumes nothing and records what you mention: each item, how much, and where it lives, plus
 burners, ovens, who's cooking, skill, diet and your Instacart store. All editable in the Kitchen sheet.
@@ -67,7 +69,7 @@ together.
 **Memory.** `kitchen.json` holds the kitchen, the plan, timers, carts and the last 30 lines of conversation. A reload
 shows where things stand, and taps work without Basil. Every few turns (`--fresh-after`) Phonic's memory is reset on
 the same connection and briefed with the same recap, so a long cook stays quick. **Clear all** in the Kitchen sheet
-starts over and keeps the kitchen.
+starts over: plan, timers, kitchen items and conversation go; the setup (burners, cooks, store) stays.
 
 **Shopping.** A computer-use agent (`shopping.py`, Claude or OpenAI) shops in a Chrome of its own, headless, with its
 own profile in `~/.basil/shopper-profile`; your everyday Chrome is never touched. It stops at the cart: a guard backs out

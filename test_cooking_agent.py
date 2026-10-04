@@ -447,6 +447,23 @@ def test_tool_calls_ignore_phonic_fields_and_report_errors(tmp_path):
     assert "error" in call(toolbox, "not_a_tool", {})
 
 
+def test_a_step_can_be_undone(tmp_path):
+    async def scenario() -> None:
+        toolbox = make_toolbox(tmp_path)
+        toolbox.set_plan("pasta", PASTA)
+        toolbox.update_step("boil", "started")
+        toolbox.update_step("boil", "not_started")  # "I didn't actually start the water"
+        boil = toolbox.kitchen.step("boil")
+        assert boil.status == "pending" and boil.started_at is None and toolbox.kitchen.timers == []
+        for step in toolbox.kitchen.steps:
+            toolbox.update_step(step.id, "done")
+        assert toolbox.kitchen.finished_at is not None
+        toolbox.update_step("boil", "not_started")  # "undo, that's not done"
+        assert toolbox.kitchen.step("boil").status == "pending" and toolbox.kitchen.finished_at is None
+
+    asyncio.run(scenario())
+
+
 def test_tool_schemas_are_strict():
     for tool in tool_definitions(shopping=True, thinking=True):
         if isinstance(tool, str):  # a Phonic built-in, by name
@@ -787,9 +804,9 @@ def test_next_steps_name_the_dish_so_several_can_be_told_apart(tmp_path):
     assert all(s["dish"] == "pasta" and s["title"] for s in do_now)
 
 
-def test_clear_all_starts_over_but_keeps_the_kitchen(tmp_path):
+def test_clear_all_starts_over_but_keeps_the_setup(tmp_path):
     async def scenario() -> Toolbox:
-        toolbox = make_toolbox(tmp_path)
+        toolbox = make_toolbox(tmp_path, profile=Profile(burners=4, cooks=2))
         toolbox.kitchen.inventory["salt"] = {"have": "plenty", "where": "spices"}
         toolbox.set_plan("pasta", PASTA)
         toolbox.set_timer("sauce", minutes=10, alert="Stir the sauce.")
@@ -800,7 +817,8 @@ def test_clear_all_starts_over_but_keeps_the_kitchen(tmp_path):
     toolbox = asyncio.run(scenario())
     saved = Kitchen.load(tmp_path / "kitchen.json")
     assert saved.steps == [] and saved.timers == [] and saved.history == [] and saved.recipes == {}
-    assert "salt" in saved.inventory and toolbox.timers.tasks == {}
+    assert saved.inventory == {} and toolbox.timers.tasks == {}
+    assert saved.profile.burners == 4 and saved.profile.cooks == 2
 
 
 def test_the_cart_link_goes_to_the_store_that_was_shopped():
@@ -1272,8 +1290,19 @@ def test_the_shopping_list_can_be_cleared_and_the_store_is_remembered(tmp_path):
 
 def test_changes_the_screen_shows_get_no_spoken_reply():
     tools = {t["tool_schema"]["function"]["name"]: t for t in tool_definitions(True, True) if isinstance(t, dict)}
-    for name in ("show_on_screen", "update_kitchen", "clear_carts", "set_timer"):
+    for name in ("show_on_screen", "update_kitchen", "clear_carts"):
         assert tools[name]["forbid_speech_after_tool_call"] is True
+    # Those end Basil's turn, so the screen stops showing him thinking; ones he answers after don't.
+    from tools import SILENT_AFTER
+
+    assert {"update_kitchen", "stay_quiet", "show_on_screen"} <= SILENT_AFTER
+    assert not {"update_step", "set_timer", "undo"} & SILENT_AFTER
+    # Timers get one word back ("Heard."), like a call in a kitchen.
+    for name in ("set_timer", "adjust_timer", "remind"):
+        assert (
+            not tools[name].get("forbid_speech_after_tool_call")
+            and "one word" in tools[name]["tool_schema"]["function"]["description"]
+        )
     # Finishing a step still gets the next thing said, and a slow plan still gets the first step.
     assert not tools["update_step"].get("forbid_speech_after_tool_call")
     assert not tools["plan_dish"].get("forbid_speech_after_tool_call")
@@ -1561,3 +1590,159 @@ def test_after_enough_turns_the_conversation_resets_on_the_same_connection(tmp_p
     assert resets(), "no reset after five turns"
     reset = resets()[0]["config"]
     assert reset["generate_welcome_message"] is False and "line 4" in reset["system_prompt"]  # briefed with the recap
+
+
+def test_push_to_talk_tells_basil_everything_he_hears_is_for_him(tmp_path, monkeypatch):
+    import types
+
+    import websockets
+    from websockets.asyncio.server import serve
+
+    import server
+
+    monkeypatch.setenv("PHONIC_API_KEY", "ph_test")
+    monkeypatch.setattr(server, "instacart", lambda args: None)
+    monkeypatch.setattr(server, "advisor", lambda: None)
+    configs: dict[str, dict] = {}
+
+    async def fake_phonic(ws) -> None:
+        config = json.loads(await ws.recv())
+        configs[ws.request.path] = config
+        try:
+            async for _ in ws:  # until the tab's conversation closes
+                pass
+        except websockets.ConnectionClosed:
+            pass
+
+    def browser(path: str):
+        class Browser:
+            request = types.SimpleNamespace(path=path)
+            state = types.SimpleNamespace(name="OPEN")
+
+            def __aiter__(self):
+                return self
+
+            async def __anext__(self):
+                await asyncio.sleep(3600)
+
+            async def send(self, raw: str) -> None:
+                pass
+
+        return Browser()
+
+    async def scenario() -> list[dict]:
+        seen = []
+        async with serve(fake_phonic, "127.0.0.1", 0) as phonic:
+            port = phonic.sockets[0].getsockname()[1]
+            for path in ["/ws?ptt=1", "/ws?quiet=1"]:
+                args = types.SimpleNamespace(
+                    voice="jerome",
+                    speed=1.0,
+                    api_base=f"ws://127.0.0.1:{port}",
+                    kitchen=str(tmp_path / "kitchen.json"),
+                    fresh_after=5,
+                )
+                configs.clear()
+                tab = asyncio.create_task(server.handle_browser(browser(path), args))
+                for _ in range(50):
+                    if configs:
+                        break
+                    await asyncio.sleep(0.05)
+                tab.cancel()
+                seen.append(next(iter(configs.values())))
+        return seen
+
+    holding, quiet = asyncio.run(scenario())
+    assert "## Push to talk" in holding["system_prompt"]
+    assert "## Push to talk" not in quiet["system_prompt"] and quiet["generate_welcome_message"] is False
+
+
+def test_undo_takes_back_the_last_change_by_voice_or_tap(tmp_path):
+    from server import apply_action, saved_toolbox
+
+    path = tmp_path / "kitchen.json"
+
+    async def tap(message: dict) -> dict | None:
+        return await apply_action(saved_toolbox(path), {"type": "action", **message})
+
+    async def scenario() -> None:
+        toolbox = make_toolbox(tmp_path)
+        assert (await toolbox.call("undo", {}))["ok"] is False  # nothing yet
+        await toolbox.call("set_plan", {"dish": "pasta", "steps": PASTA, "ingredients": None})
+        await toolbox.call("next_steps", {})  # looking changes nothing, so there's nothing to undo for it
+        await toolbox.call("update_step", {"step_id": "chop", "status": "done"})
+        await toolbox.call("set_timer", {"label": "sauce", "minutes": 10, "alert": "Stir.", "after": None})
+        await toolbox.call("adjust_timer", {"label": "sauce", "action": "cancel", "minutes": None})
+        assert toolbox.kitchen.timers == []
+
+        undone = await toolbox.call("undo", {})  # "no, put that timer back"
+        assert undone["ok"] and "adjust_timer" in undone["undid"]
+        assert [t.label for t in toolbox.kitchen.timers] == ["sauce"] and "sauce" in toolbox.timers.tasks
+        await toolbox.call("undo", {})  # and the timer was never set
+        assert toolbox.kitchen.timers == [] and "sauce" not in toolbox.timers.tasks
+        await toolbox.call("undo", {})  # "I didn't finish the onions"
+        assert toolbox.kitchen.step("chop").status == "pending"
+
+        # A tap is undone the same way, from the screen (⌘Z) or by voice in the next conversation.
+        await tap({"action": "clear_dish", "dish": "pasta"})
+        assert Kitchen.load(path).steps == []
+        note = await tap({"action": "undo"})
+        assert "undid" in note["system_message"] and Kitchen.load(path).dishes == ["pasta"]
+        again = saved_toolbox(path)
+        assert (await again.call("undo", {}))["ok"]  # the plan itself, set by voice before any of it
+        assert Kitchen.load(path).steps == []
+        for task in toolbox.timers.tasks.values():
+            task.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_a_timer_waits_while_basils_answer_is_on_its_way(tmp_path):
+    from session import Session
+
+    async def ignore(_: dict) -> None:
+        pass
+
+    class Socket:
+        async def send(self, raw: str) -> None:
+            pass
+
+    async def scenario() -> None:
+        session = Session(socket=Socket(), on_event=ignore)
+        session.toolbox = make_toolbox(tmp_path)
+        session.last_user_speech = session.awaiting_reply = time.monotonic() - 5  # the cook stopped 5 s ago
+        assert session.busy(quiet=3)  # a gap, but Basil hasn't answered yet: a timer mustn't cut in front of him
+        # He ends his turn without a word (a change the screen shows): the gap is real now.
+        call = {"tool_call_id": "t1", "tool_name": "update_kitchen", "parameters": {"cooks": 2}}
+        await session.run_tool(call)
+        session.last_assistant_activity = 0.0
+        assert not session.busy(quiet=3)
+
+    asyncio.run(scenario())
+
+
+def test_start_over_wipes_the_conversation_on_disk_and_in_basils_memory(tmp_path):
+    from session import Session
+
+    sent: list[dict] = []
+
+    async def ignore(_: dict) -> None:
+        pass
+
+    class Socket:
+        async def send(self, raw: str) -> None:
+            sent.append(json.loads(raw))
+
+    async def scenario() -> None:
+        session = Session(socket=Socket(), on_event=ignore)
+        session.toolbox = make_toolbox(tmp_path, profile=Profile(burners=4))
+        session.config, session.base_prompt = {"type": "config", "voice_id": "jerome"}, "You are Basil."
+        session.toolbox.kitchen.remember("cook", "Okay. Clear everything.")
+        session.toolbox.set_plan("pasta", PASTA)
+        await session.run_tool({"tool_call_id": "t1", "tool_name": "start_over", "parameters": {}})
+
+    asyncio.run(scenario())
+    saved = Kitchen.load(tmp_path / "kitchen.json")
+    assert saved.history == [] and saved.steps == [] and saved.profile.burners == 4
+    reset = next(m for m in sent if m["type"] == "reset")
+    assert "Clear everything" not in reset["config"]["system_prompt"]

@@ -1,11 +1,13 @@
 """The agent's custom_websocket tools: their schemas (sent in the STS config) and the handlers that run them."""
 
 import asyncio
+import copy
 import inspect
 import json
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -71,13 +73,22 @@ SLOW = {
     "tool_call_output_timeout_ms": 90_000,
 }
 ASYNC_TOOLS = {"plan_dish", "think_it_through"}
-# Changes the screen already shows: no reply after them at all, so Basil never says "cleared" a beat after it's gone
+# What "undo" puts back: everything the cook sees change on screen. Not the conversation, and not carts: those are at
+# real stores, so a cart is changed back with change_cart instead.
+UNDOABLE = ("profile", "inventory", "recipes", "steps", "timers", "finished_at", "serve_at", "how_to")
+UNDO_DEPTH = 20
+# (what changed, the state before it), oldest first, per kitchen file: shared by the screen and every conversation in
+# this server, so a reconnect or a tap with Basil asleep can still be undone. Gone on restart.
+UNDO_STACKS: dict[Path, list[tuple[str, dict]]] = {}
+# Timers and reminders get a one-word acknowledgement instead ("Heard."), like a call in a kitchen.
+# Changes the screen already shows (SILENT_AFTER, below): no reply after them at all, so Basil never says "cleared" a beat after it's gone
 # from the screen, or "pulling it up" after it's up.
 SHOWN = {**QUICK, "forbid_speech_after_tool_call": True}
 SHOWN_TOOLS = {
-    "show_on_screen", "update_kitchen", "update_ingredients", "clear_carts", "set_timer", "adjust_timer",
-    "set_listening", "clear_plan",
+    "show_on_screen", "update_kitchen", "update_ingredients", "clear_carts", "set_listening", "clear_plan",
+    "start_over",
 }  # fmt: skip
+SILENT_AFTER = SHOWN_TOOLS | {"stay_quiet"}
 
 # name -> (description, parameters, extra tool options)
 TOOL_SPECS: dict[str, tuple[str, dict, dict]] = {
@@ -263,9 +274,10 @@ TOOL_SPECS: dict[str, tuple[str, dict, dict]] = {
         {},
     ),
     "update_step": (
-        "Mark a step started or done. Starting a hands-off step (simmer, bake, rest) sets a timer for it"
-        " automatically.",
-        _obj(step_id={"type": "string"}, status={"type": "string", "enum": ["started", "done"]}),
+        "Mark a step started or done, or undo that ('undo', 'I didn't actually do the onions', 'that's not done'):"
+        " 'not_started' puts it back as if never touched and stops its timer. Starting a hands-off step (simmer, bake,"
+        " rest) sets a timer for it automatically.",
+        _obj(step_id={"type": "string"}, status={"type": "string", "enum": ["started", "done", "not_started"]}),
         {},
     ),
     "stay_quiet": (
@@ -275,13 +287,15 @@ TOOL_SPECS: dict[str, tuple[str, dict, dict]] = {
         {"forbid_speech_after_tool_call": True},
     ),
     "show_on_screen": (
-        "Drive the cook's screen: everything they could tap, they can ask you for. 'step' shows a step (step_id, or"
-        " null for the one they're on): 'what's next', 'go back', 'show me the soup'. 'plan' opens the run sheet,"
-        " narrowed to one dish if given. 'kitchen', 'shopping' and 'ingredients' open those sheets. 'nothing' clears"
-        " the screen back to what they're doing: closes any sheet or how-to card, puts away a finished cart, and"
-        " dismisses timers that went off. For 'thanks, got it', 'close that', 'clear the screen'.",
+        "Drive the cook's screen: everything they could tap, they can ask you for. When they ask to see something,"
+        " pick the view that answers it best. 'now' is the live view: with several cooks, everyone's ticket side by"
+        " side; else the step they're on. For 'what's everyone doing', 'back', 'where are we'. 'step' shows one step"
+        " (step_id): 'what's next', 'go back a step', 'show me the soup', 'what's Sam on'. 'plan' opens the run"
+        " sheet, narrowed to one dish if given: 'what's left', 'are we on time'. 'kitchen', 'shopping' and"
+        " 'ingredients' open those sheets. 'nothing' is 'now' plus putting things away: closes any how-to card, a"
+        " finished cart, timers that went off. For 'thanks, got it', 'close that', 'clear the screen'.",
         _obj(
-            view={"type": "string", "enum": ["step", "plan", "kitchen", "shopping", "ingredients", "nothing"]},
+            view={"type": "string", "enum": ["now", "step", "plan", "kitchen", "shopping", "ingredients", "nothing"]},
             step_id=_nullable("string", "For 'step': which one, or null for the one they're on."),
             dish=_nullable("string", "For 'plan': narrow it to this dish, or null for all of them."),
         ),
@@ -323,8 +337,8 @@ TOOL_SPECS: dict[str, tuple[str, dict, dict]] = {
     ),
     "set_timer": (
         "Start a kitchen timer, or queue one to start when another goes off (sear 4 min, then rest 5). It shows on the"
-        " cook's screen, so don't announce it; at most say the duration. When it goes off you'll be told, and"
-        " anything queued after it starts.",
+        " cook's screen, so don't announce it. When it goes off you'll be told, and anything queued after it starts."
+        " Then answer in one word, the way a cook acknowledges a call ('Heard.', 'Oui.'), nothing more.",
         _obj(
             label={"type": "string", "description": "One or two words, shown on screen, e.g. 'pasta'."},
             minutes={"type": "number"},
@@ -336,7 +350,8 @@ TOOL_SPECS: dict[str, tuple[str, dict, dict]] = {
     "remind": (
         "Have yourself say something at a set time: 'remind me to start the rice at 6:40', 'in 20 minutes tell me to"
         " flip the brisket'. When it's due you'll be told, and you say it once there's a gap in the conversation."
-        " Give either at or in_minutes. Cancel it with adjust_timer and its label.",
+        " Give either at or in_minutes. Cancel it with adjust_timer and its label."
+        " Then answer in one word, the way a cook acknowledges a call ('Heard.', 'Oui.'), nothing more.",
         _obj(
             label={"type": "string", "description": "One or two words, e.g. 'rice'."},
             message={"type": "string", "description": "What to say then, e.g. 'Start the rice.'"},
@@ -347,12 +362,29 @@ TOOL_SPECS: dict[str, tuple[str, dict, dict]] = {
     ),
     "adjust_timer": (
         "Pause, resume, cancel, or add time to a running timer (negative minutes take time off). The screen shows the"
-        " change, so don't announce it.",
+        " change, so don't announce it."
+        " Then answer in one word, the way a cook acknowledges a call ('Heard.', 'Oui.'), nothing more.",
         _obj(
             label={"type": "string"},
             action={"type": "string", "enum": ["pause", "resume", "add", "cancel"]},
             minutes=_nullable("number", "For add: how many minutes to add. Null otherwise."),
         ),
+        {},
+    ),
+    "start_over": (
+        "Wipe the slate: every plan, timer and reminder, what's in the kitchen, and this conversation, yours included"
+        " (your memory of it resets right after). The setup stays: burners, ovens, cooks, skill, diet, store. Only when"
+        " they plainly ask for all of it: 'clear everything', 'start over from scratch', 'forget all this'. For one"
+        " dish, clear_plan.",
+        _obj(),
+        {},
+    ),
+    "undo": (
+        "Take back the last change to the plan, a step, a timer or reminder, the serve time, the kitchen or the"
+        " ingredients, whoever made it, by voice or on screen: 'undo', 'put that back', 'no, I didn't mean that',"
+        " 'bring the soup back'. Each call goes one change further back. Carts are at real stores: change those with"
+        " change_cart. Then one word ('Heard.'), or say there's nothing to undo.",
+        _obj(),
         {},
     ),
 }
@@ -414,6 +446,35 @@ class Toolbox:
     def save(self) -> None:
         self.kitchen.save(self.path)
 
+    @property
+    def undo_stack(self) -> list[tuple[str, dict]]:
+        return UNDO_STACKS.setdefault(self.path.resolve(), [])
+
+    def _undoable(self) -> dict:
+        return {f: copy.deepcopy(getattr(self.kitchen, f)) for f in UNDOABLE}
+
+    @contextmanager
+    def recording(self, what: str) -> Iterator[None]:
+        """Remember the state before a change, by voice or by tap, so 'undo' can put it back. Nothing changed, nothing
+        to undo."""
+        before = self._undoable()
+        yield
+        if self._undoable() != before:
+            self.undo_stack.append((what, before))
+            del self.undo_stack[:-UNDO_DEPTH]
+
+    def undo(self) -> dict:
+        if not self.undo_stack:
+            return {"ok": False, "say": "Nothing to undo."}
+        what, before = self.undo_stack.pop()
+        for timer in self.kitchen.timers:  # timers come back as they were, still counting from when they were set
+            self.timers._unschedule(timer.label)
+        for f, value in before.items():
+            setattr(self.kitchen, f, value)
+        self.timers.restore()
+        self.save()
+        return {"ok": True, "undid": what}
+
     async def call(self, name: str, parameters: dict) -> dict:
         """Run a tool; errors go back to the model as data so it can correct itself mid-conversation."""
         if name not in TOOL_SPECS:
@@ -423,8 +484,12 @@ class Toolbox:
         declared = TOOL_SPECS[name][1]["properties"]
         args = {k: None if v == "null" else v for k, v in parameters.items() if k in declared}
         try:
-            result = getattr(self, name)(**args)
-            return await result if inspect.isawaitable(result) else result
+            if name in ASYNC_TOOLS or name == "undo":  # a slow plan records only its own change, when it lands
+                result = getattr(self, name)(**args)
+                return await result if inspect.isawaitable(result) else result
+            with self.recording(f"{name} {json.dumps(args)}"):
+                result = getattr(self, name)(**args)
+                return await result if inspect.isawaitable(result) else result
         except (KeyError, ValueError, TypeError) as e:
             return {"error": str(e) or type(e).__name__}
 
@@ -510,7 +575,8 @@ class Toolbox:
             raise ValueError("No planner available; write the plan yourself with set_plan.")
         context = f"Kitchen state: {json.dumps(self.get_kitchen())}\n\n{self.recap() or 'Nothing has happened yet.'}"
         plan = await self.advisor.plan(dish, notes, context)
-        result = self.set_plan(dish, plan["steps"], plan["ingredients"])
+        with self.recording(f"plan_dish {json.dumps({'dish': dish})}"):
+            result = self.set_plan(dish, plan["steps"], plan["ingredients"])
         return {**result, "planned": dish, "say": "The plan is on screen. Give the first thing to do; don't read it."}
 
     async def think_it_through(self, question: str) -> dict:
@@ -772,6 +838,10 @@ class Toolbox:
                 # Labelled with the step's title, since the label is what the cook sees on the dial.
                 self.timers.set(step.title, minutes, f"Check that '{step.text}' is done.", step_id=step_id)
                 timer_note = f"Timer '{step.title}' set for {round(minutes, 1)} minutes."
+        elif status == "not_started":
+            step.status, step.started_at = "pending", None
+            self.timers.cancel(step.title)
+            self.kitchen.finished_at = None
         else:
             step.status = "done"
             self.timers.cancel(step.title)
@@ -791,9 +861,15 @@ class Toolbox:
         self.save()
         return {"ok": True, "cooking": self.kitchen.dishes}
 
+    def start_over(self) -> dict:
+        self.clear_all()
+        return {"ok": True}
+
     def clear_all(self) -> None:
-        """Start over: every dish's plan, every timer, and the conversation go. The kitchen itself stays."""
+        """Start over: every dish's plan, every timer, what's in the kitchen, and the conversation go. The setup stays
+        (burners, ovens, cooks, skill, diet, store)."""
         self.kitchen.clear_plan(None)
+        self.kitchen.inventory = {}
         for timer in list(self.kitchen.timers):
             self.timers.cancel(timer.label)
         self.kitchen.history = []
@@ -812,7 +888,7 @@ class Toolbox:
             self.clear_plan(None)
             self.kitchen.finished_at = None
             self.save()
-        if view in ("step", "nothing") and self.kitchen.how_to is not None:
+        if view in ("now", "step", "nothing") and self.kitchen.how_to is not None:
             self.kitchen.how_to = None
             self.save()
         return {"ok": True, "showing": view, "step_id": step_id, "dish": dish}

@@ -67,6 +67,8 @@
   /* Several dishes: one tab each, a thin line for how far along it is. The dot says where the work is: ink for the
      step your hands are on, amber for one cooking by itself. Only the chosen dish's steps show in the strip. */
   #dish:has(.tab) { gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .back { flex: none; font: 500 13px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 9px 14px; border-radius: 999px; box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .back:hover { background: var(--ink); color: var(--enamel); }
   .pick { display: grid; gap: 2px; text-align: left; padding: 4px 8px; margin: -4px -8px; border-radius: 12px; }
   .pick b { font-size: 18px; line-height: 1.1; }
   .pick span { font-size: 13px; color: var(--muted); }
@@ -181,6 +183,8 @@
   .meanwhile button { display: flex; gap: 12px; align-items: center; font-size: 18px; text-align: left; }
   .meanwhile button:hover span { text-decoration: underline; text-underline-offset: 4px; }
   .meanwhile small { font-size: 14px; color: var(--muted); }
+  .meanwhile.next small { flex: none; min-width: 6.5em; font: 500 13px var(--mono); font-variant-numeric: tabular-nums; }
+  .meanwhile .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; }
   .then svg { width: 28px; height: 28px; }
   .choices { display: flex; gap: 12px; flex-wrap: wrap; }
   .choices button, .choices a { padding: 18px 34px; border-radius: 999px; font-weight: 700; font-size: 20px; text-decoration: none; box-shadow: inset 0 0 0 2px var(--ink); }
@@ -189,8 +193,8 @@
   .hero[hidden] { display: none; }
   /* The step's picture: room is held for it while it's being found or made, so the text doesn't jump. */
   .step-pic { position: relative; margin: 0; width: min(100%, 420px); aspect-ratio: 3 / 2; border-radius: 18px; overflow: hidden; background: var(--knob); }
-  .step-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .step-pic.loading { animation: flicker 1.8s ease-in-out infinite; }
+  .step-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .step-pic .wait { position: absolute; inset: 0; display: grid; place-items: center; font: 500 12px var(--mono);
     letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
   .step-pic figcaption { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: rgb(255 255 255 / .85); text-shadow: 0 1px 3px rgb(0 0 0 / .5); }
@@ -219,7 +223,9 @@
   /* Nothing cooking: the conversation is the content, so it takes the middle of the screen, on the mic's axis. */
   #work:has(> #side:empty) { grid-template-columns: minmax(0, 1fr); }
   #stage:has(> #said, > .hint) { justify-self: center; justify-items: center; text-align: center; }
-  #stage > #said { gap: 14px; max-width: min(100%, 900px); }
+  /* Captions read left to right in a column of fixed width: centred text would re-centre with every word. */
+  /* A set width, not a share of the middle (which shrinks to fit, so the column grew word by word). */
+  #stage > #said { gap: 14px; width: min(760px, calc(100vw - 2 * clamp(16px, 5vw, 64px))); text-align: start; }
   #stage > #said .line { max-height: none; -webkit-mask-image: none; mask-image: none; }
   #stage > #said .you { font-size: clamp(18px, 2vw, 22px); }
   #stage:has(> .hint) { justify-self: center; justify-items: center; text-align: center; }
@@ -229,7 +235,7 @@
   /* ---------- bottom: timers on the left, the voice in the middle: what was said, above the mic ---------- */
   footer { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 28px; align-items: end; }
   #voice { display: grid; justify-items: center; gap: 14px; }
-  #voice > #said { width: min(560px, 44vw); text-align: center; }
+  #voice > #said { width: min(520px, 44vw); text-align: start; }
   #said { display: grid; gap: 4px; min-width: 0; }
   .said { margin: 0; display: grid; font-size: 17px; line-height: 1.4; color: var(--muted); }
   .said .line { max-height: 2.8em; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;
@@ -261,7 +267,8 @@
   #mic[data-mode="off"] .disc { box-shadow: inset 0 0 0 2px var(--muted); color: var(--muted); }
   #mic[data-mode="off"] .slash { display: inline; }
   /* Before the conversation starts: a plain, still button. Blue and motion mean Basil is listening, so neither shows yet. */
-  #mic[data-mode="asleep"] .disc { box-shadow: inset 0 0 0 2px var(--ink); }
+  #mic[data-mode="asleep"] .disc, #mic[data-mode="ready"] .disc { box-shadow: inset 0 0 0 2px var(--ink); }
+  #mic { touch-action: none; } /* holding to talk: a long press mustn't scroll or open a menu */
   #mic[data-mode="asleep"]:hover .disc { background: var(--ink); color: var(--enamel); }
   #mic[data-mode="asleep"]:active .disc { transform: scale(.94); }
   @keyframes flicker { 50% { opacity: .45; } }
@@ -548,16 +555,32 @@ function connectScreen() {
 function refresh() { if (screen?.readyState === 1) screen.send(JSON.stringify({ type: "refresh" })); }
 connectScreen();
 
-// Always on: Basil listens from the moment the page opens and picks the conversation back up, quietly, whenever it
-// drops (Phonic ends one after ten minutes of nobody speaking). It's a setting on this screen, so it lives here.
-const ALWAYS_KEY = "basil.alwaysOn";
-let alwaysOn = false, retryMs = 1000;
-try { alwaysOn = localStorage.getItem(ALWAYS_KEY) === "1"; } catch {}
-function setAlwaysOn(on) {
-  alwaysOn = on;
-  try { localStorage.setItem(ALWAYS_KEY, on ? "1" : "0"); } catch {}
-  if (on && !ws) wake(true);
+// How Basil listens, a setting on this screen. Always on: from the moment the page opens, picking the conversation
+// back up, quietly, whenever it drops (Phonic ends one after ten minutes of nobody speaking). Tap: the mic button
+// starts him and mutes him. Hold: he hears only while the mic button or Space is held down.
+const ALWAYS_KEY = "basil.alwaysOn", HOLD_KEY = "basil.pushToTalk";
+let alwaysOn = false, pushToTalk = false, holding = false, retryMs = 1000;
+// Holding to talk keeps the conversation open too, quietly, so a press only has to open the mic: connecting on the
+// press would lose the first thing said.
+const stayConnected = () => alwaysOn || pushToTalk;
+try { alwaysOn = localStorage.getItem(ALWAYS_KEY) === "1"; pushToTalk = !alwaysOn && localStorage.getItem(HOLD_KEY) === "1"; } catch {}
+function setListen(how) {
+  const wasHold = pushToTalk;
+  alwaysOn = how === "always"; pushToTalk = how === "hold";
+  try { localStorage.setItem(ALWAYS_KEY, alwaysOn ? "1" : "0"); localStorage.setItem(HOLD_KEY, pushToTalk ? "1" : "0"); } catch {}
+  // Basil is told at the start of a conversation whether everything he hears is for him, so a switch to or from
+  // holding starts a new one (straight away if always on, else at the next press).
+  if (ws && wasHold !== pushToTalk) ws.close();
+  else if (stayConnected() && !ws) wake(true);
+  pilot($("mic").dataset.mode, $("mic-word").textContent);
   renderSheet();
+}
+const setAlwaysOn = (on) => setListen(on ? "always" : "tap");
+// Holding to talk: the mic is live only while held. Released, it sends silence, so Basil hears the turn end.
+function hold(on) {
+  holding = on;
+  mic?.getAudioTracks().forEach((t) => (t.enabled = on));
+  refreshPilot();
 }
 // Browsers only let sound play after the page has been touched; the first touch anywhere unlocks it.
 document.addEventListener("pointerdown", () => {
@@ -570,18 +593,19 @@ async function wake(quiet = false) {
   ctx ||= new AudioContext({ sampleRate: RATE });
   muted = false;
   const opened = Date.now();
-  ws = new WebSocket(`ws://${location.host}/ws${quiet ? "?quiet=1" : ""}`);
+  const query = [quiet && "quiet=1", pushToTalk && "ptt=1"].filter(Boolean).join("&");
+  ws = new WebSocket(`ws://${location.host}/ws${query ? `?${query}` : ""}`);
   ws.onmessage = (e) => onEvent(JSON.parse(e.data));
   ws.onclose = () => {
     // Back to asleep: the next tap starts a fresh conversation, which picks up where this one left off.
-    ws = null; talking = hearing = thinking = consulting = false; busyWith = null; hush();
+    ws = null; talking = hearing = thinking = consulting = false; busyWith = null; renderBusy(); hush();
     recognizer?.abort(); mic?.getTracks().forEach((t) => t.stop()); mic = null;
     pilot("asleep", closedBecause);
     refresh();
-    if (alwaysOn) {
+    if (stayConnected()) {
       // A conversation that ends straight away (an account problem, the server down) waits longer each time.
       retryMs = Date.now() - opened < 15000 ? Math.min(retryMs * 2, 60000) : 1000;
-      setTimeout(() => alwaysOn && wake(true), retryMs);
+      setTimeout(() => stayConnected() && !ws && wake(true), retryMs);
     }
     closedBecause = "";
   };
@@ -612,10 +636,26 @@ async function startMic() {
     ws.send(JSON.stringify({ type: "audio", audio: btoa(s) }));
   };
   ctx.createMediaStreamSource(mic).connect(node);
+  if (pushToTalk) mic.getAudioTracks().forEach((t) => (t.enabled = holding));
   refreshPilot();
 }
 
-$("mic").onclick = () => { if (!ws) return wake(); if (!mic) return; muted = !muted; mic.getAudioTracks().forEach((t) => (t.enabled = !muted)); refreshPilot(); };
+$("mic").onclick = () => {
+  if (pushToTalk) return; // pressing and letting go is the whole gesture
+  if (!ws) return wake(); if (!mic) return; muted = !muted; mic.getAudioTracks().forEach((t) => (t.enabled = !muted)); refreshPilot();
+};
+$("mic").addEventListener("pointerdown", (e) => {
+  if (!pushToTalk) return;
+  $("mic").setPointerCapture(e.pointerId);
+  hold(true);
+  if (!ws) wake();
+});
+for (const end of ["pointerup", "pointercancel", "lostpointercapture"]) $("mic").addEventListener(end, () => pushToTalk && holding && hold(false));
+document.addEventListener("keydown", (e) => {
+  if (!pushToTalk || e.code !== "Space" || e.repeat || e.target.matches?.("input, textarea")) return;
+  e.preventDefault(); hold(true); if (!ws) wake();
+});
+document.addEventListener("keyup", (e) => { if (pushToTalk && e.code === "Space" && holding) { e.preventDefault(); hold(false); } });
 
 function play(audio) {
   const bin = atob(audio), n = bin.length >> 1, buf = ctx.createBuffer(1, n, RATE), out = buf.getChannelData(0);
@@ -658,9 +698,33 @@ function busyLabel(tool, parameters = {}) {
   if (tool === "plan_dish") return parameters.dish ? `Planning ${parameters.dish.toLowerCase()}…` : "Planning…";
   return "Thinking…";
 }
+// Thinking: from the end of what you said to his first word. He may decide it wasn't for him and say nothing, so it
+// doesn't outlast a few seconds of silence.
+const THINKING_MS = 10000;
+let thinkingTimer = null;
+function setThinking(on) {
+  thinking = on;
+  clearTimeout(thinkingTimer);
+  if (on) thinkingTimer = setTimeout(() => setThinking(false), THINKING_MS);
+  refreshPilot();
+}
+// A slow consult counts its seconds, so a long one reads as working, not stuck.
+let busySince = 0, busyTicker = null;
+const busyText = () => {
+  const secs = Math.floor((Date.now() - busySince) / 1000);
+  return busyWith && secs >= 3 ? `${busyWith} ${secs}s` : busyWith || "";
+};
+function tickBusy() { // just the words: no redraw every second
+  $("busy").textContent = busyText();
+  const middle = document.querySelector("#stage > .hint.working");
+  if (middle) middle.textContent = busyText();
+}
 function renderBusy() {
+  clearInterval(busyTicker);
+  busySince = busyWith ? Date.now() : 0;
+  if (busyWith) busyTicker = setInterval(tickBusy, 1000);
   $("busy").hidden = !busyWith;
-  $("busy").textContent = busyWith || "";
+  $("busy").textContent = busyText();
   if (!plan().steps.length) render(); // on an empty screen, it takes the middle
 }
 function onEvent(m) {
@@ -673,15 +737,16 @@ function onEvent(m) {
       if (SLOW_TOOLS.includes(m.tool_name)) { consulting = true; busyWith = busyLabel(m.tool_name, m.parameters); renderBusy(); }
       break;
     case "tool_result":
+      if (m.silent) setThinking(false); // a change the screen shows, or not his turn: no answer is coming
       if (m.tool_name === "show_on_screen" && m.output.ok) showOnScreen(m.output);
       if (m.tool_name === "set_listening" && m.output.ok) setAlwaysOn(m.output.always);
       if (SLOW_TOOLS.includes(m.tool_name)) { consulting = false; busyWith = null; renderBusy(); }
       break;
-    case "assistant_started_speaking": talking = true; thinking = false; document.querySelector(".said.basil").classList.remove("pondering"); said("basil", "", true); break;
+    case "assistant_started_speaking": talking = true; setThinking(false); document.querySelector(".said.basil").classList.remove("pondering"); said("basil", "", true); break;
     case "assistant_finished_speaking": talking = false; live("basil", false); break;
     case "interrupted_response": talking = false; hush(); live("basil", false); break;
     case "user_started_speaking": hearing = true; hush(); said("you", "", true); break;
-    case "user_finished_speaking": hearing = false; thinking = true; break;
+    case "user_finished_speaking": hearing = false; setThinking(true); break;
     case "timer_fired": ring(m.label); break;
     case "phonic_closed": closedBecause = m.reason; break;
     case "state":
@@ -721,13 +786,15 @@ function stream(text) {
 
 function pilot(mode, word) {
   $("mic").dataset.mode = mode; $("mic-word").textContent = word;
-  $("mic").setAttribute("aria-label", mode === "asleep" ? "Talk to Basil" : "Mute or unmute the microphone");
+  $("mic").setAttribute("aria-label", pushToTalk ? "Hold to talk to Basil" : mode === "asleep" ? "Talk to Basil" : "Mute or unmute the microphone");
+  $("mic").title = pushToTalk ? "Hold to talk, or hold Space" : "";
 }
 function refreshPilot() {
   if (!ws || ws.readyState > 1) return;
   // The icon and its color carry the state; words only for problems the cook has to fix.
   if (!mic) return pilot("off", "No microphone");
-  pilot(muted ? "off" : talking ? "talking" : hearing ? "you" : thinking || consulting ? "thinking" : "listening", "");
+  const idle = pushToTalk && !holding ? "ready" : "listening";
+  pilot(muted ? "off" : holding ? "you" : talking ? "talking" : hearing ? "you" : thinking || consulting ? "thinking" : idle, "");
 }
 
 // ---------- helpers ----------
@@ -837,7 +904,9 @@ function cartLine(o) {
 
 // What Basil puts on screen when asked, the same as the taps that do it.
 function showOnScreen({ showing, step_id, dish }) {
-  if (showing === "nothing") {
+  if (showing === "now" || (showing === "step" && !step_id)) {
+    viewing = null; planDish = null; openSheet("nothing");
+  } else if (showing === "nothing") {
     // Back to what they're doing: no sheet, no card, no rung timers, the cart put away, the current step.
     viewing = null; planDish = null; rang.clear();
     for (const o of state?.carts || []) setAside.add(o.at);
@@ -874,7 +943,8 @@ document.addEventListener("click", (e) => {
 });
 document.addEventListener("keydown", (e) => {
   if (e.target.matches?.("input")) return; // keys in a field are for the field
-  if (e.key === "Escape" && sheetView) openSheet("nothing");
+  if (e.key === "Escape") { if (sheetView) openSheet("nothing"); else if (viewing) backToNow(); }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); act("undo"); }
   if (e.key === "ArrowRight") look(1);
   if (e.key === "ArrowLeft") look(-1);
 });
@@ -999,8 +1069,9 @@ function setupGrid(p) {
     h("span", {}, "Skill"), h("div", { class: "seg" }, ["beginner", "intermediate", "advanced"].map((skill) =>
       h("button", { "aria-pressed": String(p.skill === skill), onclick: () => act("kitchen", { skill }) }, words(skill)))),
     h("span", {}, "Basil"), h("div", { class: "seg" },
-      h("button", { "aria-pressed": String(alwaysOn), onclick: () => setAlwaysOn(true) }, "Always on"),
-      h("button", { "aria-pressed": String(!alwaysOn), onclick: () => setAlwaysOn(false) }, "When I tap")),
+      h("button", { "aria-pressed": String(alwaysOn), onclick: () => setListen("always") }, "Always on"),
+      h("button", { "aria-pressed": String(!alwaysOn && !pushToTalk), onclick: () => setListen("tap") }, "Tap"),
+      h("button", { "aria-pressed": String(pushToTalk), title: "Hold the mic, or Space, to talk", onclick: () => setListen("hold") }, "Hold")),
     h("span", {}, "Store"), field({ class: "diet", key: "store", value: p.store || "", label: "Instacart store", placeholder: "Your Instacart store" },
       (store) => store && act("kitchen", { store })),
     h("span", {}, "Diet"), field({ class: "diet", key: "diet", value: p.dietary_notes, label: "Diet", placeholder: "Allergies, likes, dislikes" },
@@ -1110,7 +1181,8 @@ function whoTag(s) {
   return name ? h("span", { class: `who c${s.cook}` }, name) : h("span");
 }
 
-// Start over: the plan, timers and conversation go; the kitchen stays. It can't be undone, so it takes a second tap.
+// Start over: the plan, timers, what's in the kitchen and the conversation go; the setup (burners, cooks...) stays.
+// It takes a second tap; undo brings back all but the conversation.
 function clearAll() {
   const button = h("button", { class: "clear" }, "Clear all");
   let armed = null;
@@ -1224,6 +1296,8 @@ function dishTab(d, selected) {
 }
 const stepNumber = (s, steps) => steps.filter((x) => x.dish === s.dish).indexOf(s) + 1;
 
+// Looking at a step that isn't the live one: one tap back to the live view (with several cooks, the pass).
+function backToNow() { viewing = null; render(); }
 function render() {
   const { steps, current, shown, eating } = plan();
   const dishes = [...new Set(steps.map((s) => s.dish))];
@@ -1233,11 +1307,15 @@ function render() {
   // Two or three dishes fit as tabs. A whole menu doesn't: the header names the dish on screen, and every dish is a
   // tap away in the plan, above the run sheet.
   const tabs = dishes.length > 1 && dishes.length <= MAX_TABS;
-  const pass = (state?.cooks?.length || 1) > 1 && !viewing && !!shown && dishes.length > 1;
+  ticketsNow = new Set();
+  // With more than one cook, the pass: a ticket for each, if anyone has something they can do now.
+  const station = !state?.how_to && shown && (state?.cooks?.length || 1) > 1 && !viewing ? stations() : null;
+  const pass = !!station && dishes.length > 1;
   $("dish").replaceChildren(...(tabs ? dishes.map((d) => dishTab(d, d === dish))
     : dishes.length > 1 ? [h("button", { class: "pick", "aria-label": `${dish}: all dishes`, onclick: (e) => { e.stopPropagation(); openSheet(sheetView === "plan" ? "nothing" : "plan"); } },
       h("b", {}, dish))]
     : dish ? [h("b", {}, dish)] : [nowClock()]).filter(() => !pass));
+  if (viewing && shown) $("dish").prepend(h("button", { class: "back", onclick: backToNow }, "← Now"));
   $("dish").setAttribute("role", tabs ? "tablist" : "none");
   $("dish").querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   preloadPictures(steps);
@@ -1250,12 +1328,11 @@ function render() {
 
   let view;
   const how = state?.how_to;
-  const passView = (state?.cooks?.length || 1) > 1 && !viewing;
-  ticketsNow = new Set();
+  const passView = !!station;
   if (how) {
     view = howToCard(how);
-  } else if (shown && passView) {
-    view = [stations()];
+  } else if (station) {
+    view = station;
   } else if (shown) {
     view = stepCard(shown);
   } else if (eating) {
@@ -1267,7 +1344,7 @@ function render() {
       h("div", { class: "act" }, h("button", { class: "early", onclick: () => { state.finished_at = null; state.steps = []; act("clear_finished"); render(); } }, "Done"))))];
   } else {
     const quiet = !$("said-you").textContent && !$("said-basil").textContent;
-    view = busyWith ? [h("p", { class: "hint working" }, busyWith)] : [quiet ? h("p", { class: "hint" }, hello()) : $("said")];
+    view = busyWith ? [h("p", { class: "hint working" }, busyText())] : [quiet ? h("p", { class: "hint" }, hello()) : $("said")];
   }
   // Captions live above the mic, except when nothing is cooking and the conversation takes the middle.
   if (!view.includes($("said"))) $("voice").prepend($("said"));
@@ -1354,6 +1431,7 @@ function stepCard(s, { alone = true, anyone = false, sameDish = false } = {}) {
   if (s.status === "in_progress" || (due && s.hands_on)) button = h("button", { class: "done", onclick: step("done") }, "Done");
   else if (due) button = h("button", { class: "done", onclick: step("started") }, "Start");
   else if (s.status === "pending" && unblocked(s)) button = h("button", { class: "early", onclick: step("started") }, "Start");
+  else if (s.status === "done") button = h("button", { class: "early", onclick: () => act("step", { step_id: s.id, status: "not_started" }) }, "Undo");
   const mine = state.steps.filter((x) => x.dish === s.dish);
   const fresh = !ticketsUp.has(s.id);
   ticketsNow.add(s.id);
@@ -1369,22 +1447,48 @@ function stepCard(s, { alone = true, anyone = false, sameDish = false } = {}) {
       status,
       button && h("div", { class: "act" }, button))),
     alone && meanwhile(s),
+    alone && upNext(s),
   ];
+}
+
+// While something cooks by itself (the oven heating, a braise), or nothing is due yet, the next few things across every
+// dish, with when: so the wait shows what it's for, and a step can be opened and started early.
+// In the pass (no `shown`), always: what comes after the tickets, and whose it is.
+function upNext(shown, onTickets = []) {
+  const { open, hands } = plan();
+  if (shown) {
+    const waiting = shown.status === "in_progress" ? !shown.hands_on : shown.status === "pending" && shown.start > 0;
+    if (viewing || !waiting) return null;
+  }
+  const skip = new Set([shown, ...hands, ...onTickets]);
+  const next = open.filter((s) => !skip.has(s) && s.status === "pending").sort((a, b) => a.start - b.start).slice(0, 3);
+  if (!next.length) return null;
+  const many = new Set(state.steps.map((s) => s.dish)).size > 1;
+  return h("ul", { class: "meanwhile next" }, next.map((s) => h("li", {},
+    h("button", { onclick: () => { viewing = s.id; render(); } },
+      h("small", {}, s.start > 0 ? h("span", { "data-until": stateAt + s.start * 60000, "data-in": "" }) : "now"),
+      many && h("i", { class: "dot", style: `background: ${dishColor(s.dish)}`, title: s.dish }),
+      cookName(s) && whoTag(s),
+      h("span", {}, s.title)))));
 }
 
 // With more than one cook, the screen is the pass: a ticket for each cook's station, side by side, each with its own
 // Done, and one for anything that just needs starting (the oven, a pot of water). No tapping across to someone else's.
+// A free cook gets their next step only if they could start it now: one further down a chain still being worked on
+// (turn the sausages, while they're not on yet) isn't theirs yet; it's in the list below. No tickets, no pass.
 function stations() {
   const { open, hands } = plan();
   const ready = open.filter((s) => s.status === "pending" && s.start === 0);
-  const nextFor = (i) => open.filter((s) => s.hands_on && s.status === "pending" && (s.cook ?? 0) === i).sort((a, b) => a.start - b.start)[0];
+  const nextFor = (i) => open.filter((s) => s.hands_on && s.status === "pending" && (s.cook ?? 0) === i && unblocked(s)).sort((a, b) => a.start - b.start)[0];
   const theirs = hands.map((s, i) => s || nextFor(i)).filter(Boolean);
   const anyone = ready.filter((s) => !s.hands_on && !theirs.includes(s)).slice(0, 1);
+  if (!theirs.length && !anyone.length) return null;
   // The dish goes on each ticket only when they're for different dishes; otherwise the top bar says it once.
   const sameDish = new Set([...theirs, ...anyone].map((s) => s.dish)).size === 1;
-  return h("div", { class: "pass" },
+  const pass = h("div", { class: "pass" },
     ...theirs.flatMap((s) => stepCard(s, { alone: false, sameDish })),
     ...anyone.flatMap((s) => stepCard(s, { alone: false, anyone: true, sameDish })));
+  return [pass, upNext(null, [...theirs, ...anyone])];
 }
 // An instruction that only repeats its heading ("Bloom the gelatin." under "Bloom the gelatin") says nothing.
 const sameWords = (a, b) => a.toLowerCase().replace(/[^a-z0-9]+/g, "") === b.toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -1482,7 +1586,8 @@ function tick() {
   }
 }
 setInterval(tick, 1000);
-if (alwaysOn) wake(true); // last, once everything it touches exists
+pilot("asleep", "");
+if (stayConnected()) wake(true); // last, once everything it touches exists
 </script>
 </body>
 </html>

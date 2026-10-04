@@ -20,7 +20,7 @@ from advisor import Advisor, OpenAIAdvisor
 from kitchen import Kitchen
 from shopping import VIEWER_URL, InstacartShopper, OpenAIShopper, find_chrome, sandbox_running, start_local_browser
 from timers import Timers
-from tools import ASYNC_TOOLS, TOOL_SPECS, Toolbox, tool_definitions
+from tools import ASYNC_TOOLS, SILENT_AFTER, TOOL_SPECS, Toolbox, tool_definitions
 
 # Re-read at the start of every conversation, so edits take effect on the next one without a restart.
 SYSTEM_PROMPT_PATH = Path(__file__).parent / "system_prompt.md"
@@ -62,9 +62,10 @@ class Urgency:
     patience: float
 
 
-# A timer can't wait long (the pasta overcooks), so it takes the first short pause and cuts in after 20 s. A reminder
-# or a step coming due waits for the conversation to wind down; the cart can wait longest.
-TIMER = Urgency(quiet=1.5, patience=20)
+# A timer can't wait long (the pasta overcooks; its dial rings on screen straight away), so it takes the first real
+# pause and cuts in only after 40 s. A reminder or a step coming due waits for the conversation to wind down; the cart
+# can wait longest.
+TIMER = Urgency(quiet=3, patience=40)
 DUE = Urgency(quiet=3, patience=90)
 REMINDER = Urgency(quiet=4, patience=180)
 LATER = Urgency(quiet=4, patience=300)
@@ -76,6 +77,9 @@ DUE_CHECK_SECONDS = 10
 FRESH_AFTER_TURNS = 5
 # What counts as a real pause: nobody talking for this long, nothing running, nothing waiting to be said.
 FRESH_QUIET_SECONDS = 8
+# After the cook speaks, Basil's answer is on its way: no one cuts in for this long unless he starts, or ends his turn
+# silently (a change the screen shows, or it wasn't for him). Phonic can take a few seconds, longer with a tool.
+REPLY_WAIT_SECONDS = 8
 
 OnEvent = Callable[[dict], Awaitable[None]]
 
@@ -113,6 +117,7 @@ class Session:
         self.resume_instruction: str | None = None
         self.ended = asyncio.Event()
         self.last_user_speech = 0.0
+        self.awaiting_reply = 0.0  # when the cook last finished speaking, until Basil answers or passes; 0 if not
         self.turns = 0  # what the cook has said in this conversation
         self.announcing = False  # an unprompted line is waiting for its gap or being said
         self.config: dict = {}  # what the conversation was started with, for a reset to start again from
@@ -158,6 +163,7 @@ class Session:
             or self.tool_running
             or now - self.last_assistant_activity < quiet
             or now - self.last_user_speech < quiet
+            or (self.awaiting_reply and now - self.awaiting_reply < REPLY_WAIT_SECONDS)
         )
 
     async def speak_announcements(self) -> None:
@@ -250,6 +256,7 @@ class Session:
                             message = {**message, "text": LEAKED_TOOL.sub("", message["text"])}
                 case "assistant_started_speaking":
                     self.assistant_speaking = True
+                    self.awaiting_reply = 0.0
                     self.assistant_started.set()
                     self.last_assistant_activity = time.monotonic()
                     self.reply = ""
@@ -266,7 +273,7 @@ class Session:
                     self.user_speaking = True
                 case "user_finished_speaking":
                     self.user_speaking = False
-                    self.last_user_speech = time.monotonic()
+                    self.last_user_speech = self.awaiting_reply = time.monotonic()
                 case "tool_call" if message["tool_name"] not in TOOL_SPECS:
                     # A Phonic built-in (choose_not_to_respond) runs on Phonic's side; there's nothing to answer.
                     logging.info(f"built-in tool {message['tool_name']}")
@@ -299,7 +306,15 @@ class Session:
             self.last_assistant_activity = time.monotonic()
         logging.info(f"tool {name} {json.dumps(parameters)[:400]} -> {json.dumps(output)[:400]}")
         await self.send({"type": "tool_call_output", "tool_call_id": call["tool_call_id"], "output": output})
-        await self.on_event({"type": "tool_result", "tool_name": name, "parameters": parameters, "output": output})
+        # A tool Basil doesn't speak after ends his turn: the screen stops showing him as thinking.
+        silent = name in SILENT_AFTER
+        if silent:
+            self.awaiting_reply = 0.0
+        if name == "start_over" and output.get("ok"):
+            await self.reset()  # the conversation is wiped on disk; Phonic's memory of it goes too
+        await self.on_event(
+            {"type": "tool_result", "tool_name": name, "parameters": parameters, "output": output, "silent": silent}
+        )
 
     @property
     def tool_running(self) -> bool:
@@ -331,6 +346,10 @@ SPOKEN_TOOL_NAMES = [*TOOL_SPECS, "choose_not_to_respond", "natural_conversation
 LEAKED_TOOL = re.compile(r"\btool_[a-z_]+\b\.?")
 
 # Appended to the system prompt when shopping is off, since the prompt file describes the Instacart flow.
+PUSH_TO_TALK_NOTE = (
+    "## Push to talk\nThey hold a button to talk to you, so everything you hear is meant for you: answer it, never"
+    " stay quiet."
+)
 NO_SHOPPING_NOTE = (
     "## Shopping is off\nYou can't send shopping lists. When the cook needs something, say what to buy in a few words."
 )
@@ -409,6 +428,7 @@ async def open_session(
     api_base: str,
     quiet: bool = False,
     fresh_after: int = FRESH_AFTER_TURNS,
+    push_to_talk: bool = False,
 ) -> AsyncIterator[Session]:
     """Connect to Phonic, start the conversation, and keep the receive and silence loops running while open.
 
@@ -460,6 +480,7 @@ async def open_session(
         # With history on disk this is a reconnect: brief the agent instead of greeting the cook from scratch.
         recap = session.toolbox.recap()
         prompt = SYSTEM_PROMPT_PATH.read_text() + ("" if instacart else f"\n\n{NO_SHOPPING_NOTE}")
+        prompt += f"\n\n{PUSH_TO_TALK_NOTE}" if push_to_talk else ""
         config["system_prompt"] = prompt + (f"\n\n{recap}" if recap else "")
         if recap or quiet:
             config["generate_welcome_message"] = False

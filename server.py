@@ -140,10 +140,25 @@ async def apply_action(toolbox: Toolbox, message: dict) -> dict | None:
 
 
 async def _apply_action(toolbox: Toolbox, message: dict) -> dict | None:
+    if message["action"] == "undo":
+        result = toolbox.undo()
+        what = f"undid the last change ({result['undid']})" if result["ok"] else "tried to undo, but there was nothing"
+        return {"type": "add_system_message", "system_message": f"[The cook {what} in the app. Say nothing.]"}
+    # Every tap that changes the plan, timers or kitchen can be taken back with undo, the same as Basil's changes.
+    with toolbox.recording(
+        f"tapped {message['action']} {json.dumps({k: v for k, v in message.items() if k not in ('type', 'action')})}"
+    ):
+        return await _apply_tap(toolbox, message)
+
+
+async def _apply_tap(toolbox: Toolbox, message: dict) -> dict | None:
     match message["action"]:
         case "step":
             step = toolbox.kitchen.step(message["step_id"])
             toolbox.update_step(step.id, message["status"])
+            if message["status"] == "not_started":
+                note = f"The cook tapped Undo on '{step.title}' in the app: it's back to not started. Say nothing."
+                return {"type": "generate_reply", "system_message": f"[{note}]"}
             note = (
                 f"The cook tapped '{step.title}' as {message['status']} in the app. The screen now shows what's next;"
                 " don't read it out. Say a few words only if they need something it doesn't show: a cue, a warning,"
@@ -181,7 +196,7 @@ async def _apply_action(toolbox: Toolbox, message: dict) -> dict | None:
             return {"type": "add_system_message", "system_message": note}
         case "clear_all":
             toolbox.clear_all()
-            note = "[The cook tapped Clear all: the plan, timers and conversation are gone. Start fresh; say nothing.]"
+            note = "[The cook tapped Clear all: the plan, timers, kitchen items and conversation are gone (the setup stays). Start fresh; say nothing.]"
             return {"type": "add_system_message", "system_message": note}
         case "kitchen":
             # An edit in the Kitchen sheet: items with how much and where, or the setup (burners, skill, diet...).
@@ -247,7 +262,10 @@ async def _apply_action(toolbox: Toolbox, message: dict) -> dict | None:
 
 
 async def handle_action(browser: ServerConnection, session: Session, message: dict) -> None:
-    if note := await apply_action(session.toolbox, message):
+    note = await apply_action(session.toolbox, message)
+    if message["action"] == "clear_all":
+        await session.reset()  # the conversation is wiped on disk; Phonic's memory of it goes too
+    elif note:
         await session.send(note)
     await push_state(browser, session)
 
@@ -286,10 +304,11 @@ async def handle_browser(browser: ServerConnection, args: argparse.Namespace) ->
                 case "action":
                     await handle_action(browser, session, message)
 
-    quiet = "quiet=1" in urllib.parse.urlsplit(browser.request.path).query
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(browser.request.path).query)
+    quiet, push_to_talk = query.get("quiet") == ["1"], query.get("ptt") == ["1"]
     # Checking for the shopping browser makes blocking calls; off the event loop, so no one's audio stalls meanwhile.
     shopper = await asyncio.to_thread(instacart, args)
-    session_args = (args.voice, args.speed, shopper, advisor(), args.api_base, quiet, args.fresh_after)
+    session_args = (args.voice, args.speed, shopper, advisor(), args.api_base, quiet, args.fresh_after, push_to_talk)
     try:
         async with open_session(Path(args.kitchen), forward, *session_args) as session:
             # Stop when either side goes away: the tab closes, or Phonic ends the conversation.
