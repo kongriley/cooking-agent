@@ -83,22 +83,22 @@ class Images:
 
 COMMONS_SEARCH_URL = "https://commons.wikimedia.org/w/api.php"
 OPENAI_IMAGES_URL = "https://api.openai.com/v1/images/generations"
-GENERATED_MODEL = "gpt-image-2"
+# OpenAI's fastest high-quality image model; at medium it's quicker than gpt-image-2 at low (about 9 s vs 11 s a
+# picture) and noticeably truer to the step.
+GENERATED_MODEL = "gpt-image-2.5-flare"
 VET_MODEL = "claude-opus-5-5"
 # Generating takes ~10 s a picture; two at a time keeps a fresh plan's pictures arriving steadily without a burst.
-MAX_CONCURRENT_PICTURES = 2
+MAX_CONCURRENT_PICTURES = 4
 
 
 class StepPictures:
-    """A picture for each recipe step: a real photo from Wikimedia Commons when Claude confirms it shows the step,
-    otherwise an illustration generated from the step's instruction. Results are cached on disk by step."""
+    """A picture for each recipe step, generated from the step's instruction. Results are cached on disk by step."""
 
-    def __init__(self, cache_dir: Path, claude: "anthropic.AsyncAnthropic | None", openai_key: str | None) -> None:
+    def __init__(self, cache_dir: Path, openai_key: str | None) -> None:
         self.cache_dir = cache_dir
         cache_dir.mkdir(exist_ok=True)
         self.index_path = cache_dir / "index.json"
         self.index: dict[str, str | None] = json.loads(self.index_path.read_text()) if self.index_path.exists() else {}
-        self.claude = claude
         self.openai_key = openai_key
         self.limit = asyncio.Semaphore(MAX_CONCURRENT_PICTURES)
         self.pending: dict[str, asyncio.Task] = {}  # the page asks for each picture twice (preload, then display)
@@ -127,71 +127,10 @@ class StepPictures:
         return found
 
     async def _find(self, key: str, dish: str, title: str, text: str) -> str | None:
+        if self.openai_key is None:
+            return None
         async with self.limit, aiohttp.ClientSession(headers=HEADERS, timeout=aiohttp.ClientTimeout(total=90)) as http:
-            if self.claude is not None:
-                try:
-                    candidates = await self._commons(http, [f"{dish} {title}"])
-                except aiohttp.ClientError as e:  # Commons rate-limits bursts; an illustration still does the job
-                    logging.warning(f"Commons search failed ({e}); illustrating instead")
-                    candidates = []
-                try:
-                    photo = await self._vet(http, candidates, dish, title, text)
-                except (aiohttp.ClientError, anthropic.APIError) as e:
-                    logging.warning(f"couldn't check the photos ({e}); illustrating instead")
-                    photo = None
-                if photo:
-                    return photo
-            if self.openai_key is not None:
-                return await self._generate(http, key, dish, text)
-            return None
-
-    async def _commons(self, http: aiohttp.ClientSession, queries: list[str]) -> list[str]:
-        found: list[str] = []
-        for query in queries:
-            params = {
-                "action": "query", "format": "json", "generator": "search", "gsrnamespace": "6", "gsrlimit": "3",
-                "gsrsearch": f"{query} filetype:bitmap", "prop": "imageinfo", "iiprop": "url", "iiurlwidth": "640",
-            }  # fmt: skip
-            async with http.get(COMMONS_SEARCH_URL, params=params) as response:
-                response.raise_for_status()
-                pages = (await response.json()).get("query", {}).get("pages", {})
-            for page in sorted(pages.values(), key=lambda p: p["index"]):
-                url = page["imageinfo"][0].get("thumburl")
-                if url and url not in found:
-                    found.append(url)
-        return found[:4]
-
-    async def _vet(
-        self, http: aiohttp.ClientSession, candidates: list[str], dish: str, title: str, text: str
-    ) -> str | None:
-        """Claude looks at the candidates and picks one only if it clearly shows the step being done."""
-        if not candidates:
-            return None
-        content: list[dict] = []
-        for n, url in enumerate(candidates, 1):
-            # Sent as data: Anthropic's own fetcher times out on Wikimedia's servers.
-            async with http.get(url) as response:
-                response.raise_for_status()
-                media_type, data = response.content_type, base64.b64encode(await response.read()).decode()
-            source = {"type": "base64", "media_type": media_type, "data": data}
-            content += [{"type": "text", "text": f"Photo {n}:"}, {"type": "image", "source": source}]
-        content.append({
-            "type": "text",
-            "text": f"Cooking {dish}, the step is: {title}. {text}\nWhich photo clearly shows this step being done, the way"
-            " a cookbook would illustrate it? A finished dish, a shop, a different food or a vaguely related scene doesn't"
-            " count. Reply with just the photo number, or 0 if none fits.",
-        })  # fmt: skip
-        response = await self.claude.beta.messages.create(
-            model=VET_MODEL,
-            max_tokens=2000,
-            messages=[{"role": "user", "content": content}],
-            output_config={"effort": "low"},
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-        )
-        reply = "".join(b.text for b in response.content if b.type == "text").strip()
-        choice = int(reply) if reply.isdigit() else 0
-        return candidates[choice - 1] if 0 < choice <= len(candidates) else None
+            return await self._generate(http, key, dish, text)
 
     async def _generate(self, http: aiohttp.ClientSession, key: str, dish: str, text: str) -> str:
         prompt = (
@@ -199,7 +138,7 @@ class StepPictures:
             " daylight, seen from slightly above. No text, no logos."
         )
         body = {
-            "model": GENERATED_MODEL, "prompt": prompt, "size": "1536x1024", "quality": "low", "n": 1,
+            "model": GENERATED_MODEL, "prompt": prompt, "size": "1536x1024", "quality": "medium", "n": 1,
             "output_format": "webp", "output_compression": 80,  # a tenth the size of the default PNG
         }  # fmt: skip
         headers = {"Authorization": f"Bearer {self.openai_key}"}

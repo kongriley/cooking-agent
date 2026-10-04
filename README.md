@@ -1,8 +1,8 @@
 # Basil
 
-A voice cooking coach built on [Phonic](https://phonic.ai)'s speech-to-speech API. Tell it what you have and what you
-want to eat. It picks a recipe, works out what to buy, plans the cook around your stove, walks you through each step,
-keeps the timers, and speaks up on its own when one goes off. It can also fill your Instacart cart.
+A voice cooking coach on [Phonic](https://phonic.ai)'s speech-to-speech API. Tell him what you have and what you want
+to eat. He picks a recipe, plans the cook around your stove and your guests' arrival time, walks you through it, keeps
+the timers, and shops for what's missing.
 
 ## Run
 
@@ -11,71 +11,78 @@ echo 'PHONIC_API_KEY=ph_...' > .env                 # a prod Phonic key
 infisical run --env=dev -- uv run server.py         # open http://localhost:8000 in Chrome
 ```
 
-Infisical supplies `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`. Without them Basil still runs, but without step pictures,
-the "thinking" indicator, or shopping. Chrome only allows the mic on `localhost`, so on a remote box forward the port:
-`ssh -L 8000:localhost:8000 -L 6080:localhost:6080 <host>`.
+Run it in a terminal of its own, not from an app's Run button: another Run can stop it. Basil's planner, supervisor,
+shopper and step pictures need `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` (OpenAI alone covers everything; override its
+model with `BASIL_OPENAI_MODEL`). Without either, Basil still cooks, using Phonic's built-in supervisor. Chrome only
+allows the mic on `localhost`, so on a remote box forward the port: `ssh -L 8000:localhost:8000 <host>`.
 
 | Flag | Default | |
 |---|---|---|
-| `--voice` / `--speed` | `jerome` / `1.5` | Phonic voice and speaking speed (0.5–1.5) |
-| `--kitchen` | `kitchen.json` | Where the kitchen, plan, timers and conversation history persist |
-| `--instacart` | `auto` | `browser` requires the shopping sandbox, `off` disables it, `auto` uses it when it's there |
+| `--voice` / `--speed` | `jerome` / `1.15` | Phonic voice and speaking speed (0.5–1.5) |
+| `--fresh-after` | `5` | Turns before a fresh Phonic conversation, started at the next real pause and briefed with a recap; `0` never |
+| `--kitchen` | `kitchen.json` | Where the kitchen, plan, timers, carts and conversation persist |
+| `--instacart` | `auto` | `local`: a headless Chrome on this computer. `browser`: the Docker sandbox. `off`. `auto`: the sandbox if it's running, else local |
 | `--port`, `--host`, `--api-base` | | |
 
-`uv run client.py` is a typed version of the same agent for scripted runs (`/wait <seconds>`, `/quit`).
-`system_prompt.md` is re-read at the start of every conversation, so prompt edits need only a page reload.
-
-Tests: `uv run pytest`. Lint: `uv run ruff check . && uv run ruff format --check .`.
+`system_prompt.md` is re-read for every conversation, so prompt edits need only a page reload; Python changes need a
+restart. `uv run client.py` is a typed version for scripted runs. Tests: `uv run pytest`. Lint:
+`uv run ruff check . && uv run ruff format --check .`.
 
 ## What it does
 
-**Conversation.** Basil talks like a terse chef: one sentence, concrete cues ("You'll smell it go nutty"), no
-praise, no "let me check". It opens with "Basil here. What are we cooking?" and leads: it says what to do next
-before you ask.
+**Basil.** French, from outside Lyon: a Lyon bouchon, the line in Paris, then ten years at a bistro abroad, where he
+picked up the kitchen English ("Heard." "Behind you."). Particular because he cares (good butter, salt early, taste
+often, cook what's good this week), never a caricature. Dry, terse, a step ahead; he never reads out what's on
+screen. Phonic carries the emotion from the persona and the example exchanges; French kitchen words are pronounced
+properly (`PRONUNCIATIONS` in `session.py`). The character is "Who you are" in `system_prompt.md`.
 
-**Your kitchen.** Basil starts knowing nothing. It doesn't assume an empty pantry or a full one. It records what you
-mention: each item with how much you have ("half a lemon", "2 packets") and where it lives (fridge, freezer, pantry,
-spices, tools), plus burners, ovens, number of cooks, skill and diet. It asks about the unknowns that matter. The
-Kitchen sheet lists all of this, shelf by shelf.
+**Listening.** Silence is his default. He answers when you say "Basil", answer his question, or plainly ask him
+something about the cooking; cooks talking to each other get nothing (his `stay_quiet` tool). Timers, reminders and
+steps coming due always come through. *Always on* in the Kitchen sheet keeps him listening and quietly reconnecting.
 
-**Recipes and planning.** For decisions worth getting right, such as choosing a recipe, planning, or recovering when
-something goes wrong, Basil consults Claude Opus (`think_it_through`). Meanwhile the screen shows
-"Thinking…". Basil then saves a plan: cookbook-voice steps, each with a duration, dependencies, the burner or oven it
-takes, whether it's hands-on, and which ingredients it uses. The code does the scheduling, not the model:
-- the critical path goes first;
-- one cook never gets two hands-on steps at once;
-- no more burners or ovens are used than you have;
-- beginners get 1.5× time on hands-on work.
+**Voice for everything.** Anything you can tap, you can say: "thanks, got it" finishes what's in front of you (a step,
+a card, a rung timer); "go back", "show me the soup plan", "take the cream off my list", "clear the screen", "start
+over" all work. After an action the screen already shows, Basil says nothing; the screen is the confirmation.
 
-Several dishes can cook at once and are scheduled together. Each dish can be replanned or stopped on its own.
+**Your kitchen.** Basil assumes nothing and records what you mention: each item, how much, and where it lives, plus
+burners, ovens, who's cooking, skill, diet and your Instacart store. All editable in the Kitchen sheet.
 
-**Cooking.** The middle of the screen is the current step: its title, the instruction in large type, a countdown
-if it's running, and **Done**. The header shows every step as a numbered dot (a tick once done, amber while cooking on
-its own). Tap one to read ahead or go back. Beside the step are:
-- a picture of that step: a real Wikimedia Commons photo when Claude confirms it shows the step, otherwise a
-  generated illustration labelled as one;
-- the dish's ingredient list, cookbook style: amount, then name. What the step uses is darker, what's missing is red,
-  and one button buys what's missing.
+**Planning.** `plan_dish` has a stronger model (Claude Opus or OpenAI) write the whole plan in about 20 seconds while
+the conversation carries on; Basil says a line first. Steps read like a chef's prep list ("Garlic in. Pale gold, 2
+min."), with no gather-and-check busywork. The code schedules, not the model: long chains first, one hands-on step per
+cook, no more burners than you have, two things per oven, beginners get more time. Give a time to eat and the plan works
+back from it so every dish lands together; when a step's start time comes, Basil says so. The **Plan** sheet is the run
+sheet: every remaining step on a timeline, colour-coded by dish, with free time marked.
 
-**Timers.** These run in the server, not the model. Starting a hands-off step sets one automatically. Basil gives a
-heads-up a minute before timers of four minutes or more. When one goes off, Basil speaks without being asked, waiting
-a few seconds if someone is mid-sentence. The dials at the bottom pause and resume on tap. A timer that has gone off
-offers "+1 min" and "Done". You can also pause, extend or cancel timers by voice.
+**The screen.** The step is an order ticket on a rail; **Done** stamps it DONE, **Start** stamps it FIRED. With two or
+more cooks the screen is the pass: a compact ticket per cook, each with its own Done. Beside the step: a picture
+(generated with `gpt-image-2.5-flare`, four at a time as soon as the plan exists) and the ingredient list, editable.
+Timers are oven knobs; a timer can queue behind another ("sear, then rest"). "How do I use a moka pot?" gets a how-to
+card of numbered steps with pictures. A finished meal shows "Plates up." until Done or 20 minutes.
 
-**Captions.** The last thing you and Basil said streams in above the mic, at the bottom centre. While nothing is
-cooking, the conversation takes the middle of the screen.
+**Timers and reminders.** They run in the server. Everything Basil says unprompted goes through one queue: each line
+waits for a pause (a timer up to 20 seconds, a reminder up to three minutes), and things that come due together are said
+together.
 
-**Memory.** Everything persists in `kitchen.json`, including the last 30 lines of conversation. Opening or refreshing
-the page shows where things stand straight away, before Basil is listening, and taps on steps and timers work without
-Basil. Tapping the mic starts the conversation; Basil gets a recap and picks up where you were instead of greeting you
-again. A finished meal shows "Ready to eat." for an hour, then clears. **Clear all**, at the bottom of the Kitchen
-sheet, starts over: the plan, timers and conversation go, the kitchen stays. It asks for a second tap.
+**Memory.** `kitchen.json` holds the kitchen, the plan, timers, carts and the last 30 lines of conversation. A reload
+shows where things stand, and taps work without Basil. Every few turns (`--fresh-after`) the Phonic conversation is
+swapped for a fresh one, briefed with the same recap, so a long cook stays quick. **Clear all** in the Kitchen sheet
+starts over and keeps the kitchen.
 
-**Shopping.** Instacart has no public cart API, so a Claude computer-use agent (`shopping.py`) uses the website in a
-sandboxed Chromium (`shopper/`, Docker). It searches each item, adds a sensible match, and stops at the cart: a guard
-backs out of any checkout page, so you always review and pay yourself. It runs in the background while you keep
-cooking, and Basil tells you when it's done or what it couldn't find. This drives the website the way a person
-would, which Instacart's terms likely don't allow, so it runs on your own account at your own risk.
+**Shopping.** A computer-use agent (`shopping.py`, Claude or OpenAI) shops in a Chrome of its own, headless, with its
+own profile in `~/.basil/shopper-profile`; your everyday Chrome is never touched. It stops at the cart: a guard backs out
+of checkout, so you always review and pay. Sign in to Instacart once with **Sign in**: a window opens, then closes
+itself once you're through. Screenshots go to the model as JPEG, since some networks break large uploads.
+- **Instacart:** fills your usual store's cart (Basil asks once), or changes it ("take the milk out", "two lemons").
+  **Review** opens it in your own browser.
+- **Any store's site:** for something premium ("the good prosciutto from Murray's"), Basil shops that site as a guest.
+  That cart lives in the shopping browser: the sheet shows a picture of it, and **Open** shows it in a window.
+- **One cart per store.** Every run is told what's already in that store's cart, so it sets quantities instead of
+  duplicating; the Shopping sheet shows one entry per store, with the shopper's screen live while it works. "How's
+  the shopping going?" gets a real answer (`check_shopping`). Only one run drives the browser at a time.
+
+This drives websites the way a person would, which some stores' terms don't allow; it runs on your accounts, at your
+own risk. For a stricter sandbox, run the Docker browser (`shopper/`) and sign in at `http://localhost:6080/vnc.html`:
 
 ```bash
 cd shopper && docker build -t basil-shopper . && cd ..
@@ -83,44 +90,29 @@ docker run -d --name basil-shopper --restart unless-stopped -p 127.0.0.1:9223:92
   -v basil-shopper-profile:/profile --shm-size=1g basil-shopper
 ```
 
-Sign in to Instacart once at `http://localhost:6080/vnc.html`, the sandbox's screen. The login persists in the
-volume, and you can watch the agent shop there. Carts belong to your Instacart account and are per store, so to review
-and pay, be signed in to the same account in your own browser: **Review** opens the store the agent used, where
-"View cart" shows what it added. (Instacart has no link that opens the cart itself.)
-
 ## How it's built
 
 | File | What it does |
 |---|---|
-| `server.py` + `index.html` | Web app: serves the page and bridges each browser tab to its own Phonic conversation |
-| `session.py` | One Phonic conversation: config, tool dispatch, unprompted turns (timer alerts, cart updates), recap |
-| `system_prompt.md` | Basil's voice and rules |
-| `tools.py` | Tool schemas sent inline in the config, and their handlers |
-| `kitchen.py` | Kitchen state, persistence and the step scheduler |
-| `timers.py` | Persistent, pausable timers with heads-up nudges |
-| `advisor.py` | The Claude Opus consult behind `think_it_through` |
-| `images.py` | Ingredient/tool photos (TheMealDB, Wikipedia) and step pictures (Commons + Claude vetting, else gpt-image-2) |
-| `shopping.py`, `shopper/` | The computer-use Instacart agent and its Docker browser |
+| `server.py` + `index.html` | Serves the page; bridges each tab to its Phonic conversation, swapping in fresh ones |
+| `session.py` | One Phonic conversation: config, tools, the unprompted-speech queue, the due-step watcher |
+| `system_prompt.md` | Basil's character and principles |
+| `tools.py` | Tool schemas (with per-tool Phonic speech settings) and handlers |
+| `kitchen.py` | Kitchen state, persistence and the scheduler |
+| `timers.py` | Persistent timers, queued timers and reminders |
+| `advisor.py` | The planner and supervisor (Claude or OpenAI) |
+| `openai_api.py` | OpenAI's Responses API over plain HTTP, with retries |
+| `images.py` | Ingredient and dish photos (TheMealDB, Wikipedia) and generated step pictures |
+| `shopping.py`, `shopper/` | The shopping agent, its headless Chrome, and the Docker browser |
 | `client.py` | Terminal front end |
 
-- **Phonic usage.** The server opens `wss://api.phonic.ai/v1/sts/ws` with `phonic_model: phonic_v1` and sends every
-  tool inline as a custom websocket tool, so nothing needs setting up in the Phonic dashboard. The browser streams
-  16 kHz PCM in 20 ms frames from an AudioWorklet and plays back the agent's audio. The API keys, tools and timers
-  all stay on the server.
-- **Speaking up unprompted.** Phonic's async tools can't make the agent talk later. Waiting on the tool leaves the
-  agent stuck until it returns, and not waiting means the result is read only on your next turn. So timers and
-  cart updates are asyncio tasks in the server that send `generate_reply` with a system message when they fire.
-- **Our own supervisor.** `think_it_through` replaces Phonic's built-in supervisor because the server can't see
-  when that one starts and stops, and it needs to in order to show that Basil is thinking.
-- **Tool arguments are cleaned up.** The model sometimes sends the string `"null"` or leaves out nullable fields.
-- **Old files still load.** `kitchen.json` from earlier formats loads without error.
+- **Phonic.** `wss://api.phonic.ai/v1/sts/ws` with every tool sent inline, so nothing is set up in the dashboard.
+  Quick tools are silent (Phonic otherwise speaks before every call); screen actions get no reply after; slow ones
+  (`plan_dish`, `think_it_through`) run async, with a line first.
+- **Speaking unprompted.** Timers, reminders, due steps and cart updates are server tasks that send `generate_reply`.
 
 ## Known rough edges
 
-- **Filler speech before tools.** Basil sometimes says "Let me think through…" or "Saving what you've got" before
-  a tool call, despite the prompt. This comes from Phonic's model; the prompt can't fully stop it.
-- **Commons rate limits.** Wikimedia Commons rate-limits bursts, so most step pictures so far are illustrations. The
-  real-photo path works, but this machine has rarely reached it.
-- **Inferred amounts.** Basil sometimes fills in an amount you never gave ("plenty" of butter).
-- **Shopping untested at checkout.** The shopping agent is tested up to the point where it needs you to sign in. A
-  full cart run still needs a signed-in sandbox.
+- **Inferred amounts.** Basil sometimes records an amount you never gave ("plenty" of butter).
+- **Leaked tool names.** Phonic occasionally speaks a tool's name; it's kept out of captions and history.
+- **Shopping is slow.** A cart of 15–20 items takes several minutes.

@@ -73,7 +73,7 @@ def main() -> None:
     parser.add_argument("--kitchen", default=str(HERE / "kitchen.json"), help="where pantry, plan and timers persist")
     parser.add_argument("--api-base", default="wss://api.phonic.ai")
     parser.add_argument("--voice", default="jerome")
-    parser.add_argument("--speed", type=float, default=1.5, help="speaking speed, 0.5 to 1.5")
+    parser.add_argument("--speed", type=float, default=1.15, help="speaking speed, 0.5 to 1.5")
     parser.add_argument(
         "--instacart",
         choices=["auto", "off", "browser"],

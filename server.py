@@ -7,36 +7,40 @@ The browser only does audio and display; the API key, tools and timers stay in t
 
 import argparse
 import asyncio
+import faulthandler
 import json
 import logging
 import os
 import re
+import signal
 import urllib.parse
 from functools import partial
 from http import HTTPStatus
 from pathlib import Path
 
-import anthropic
 from dotenv import load_dotenv
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
 
+import shopping
 from images import Images, StepPictures
 from kitchen import Kitchen, Timer
 from session import Session, advisor, instacart, open_session
+from shopping import sign_in
 from timers import Timers
 from tools import Toolbox
 
 HERE = Path(__file__).parent
 # Events after which the panes need fresh state.
-STATE_CHANGING_EVENTS = {"tool_result", "timer_fired", "conversation_created", "cart_update"}
+STATE_CHANGING_EVENTS = {"tool_result", "timer_fired", "reminder", "step_due", "conversation_created", "cart_update"}
 
 
 IMAGES = Images(HERE / "images.json")
 STEP_PICTURES_DIR = HERE / "step_pictures"
 STEP_PICTURES: StepPictures  # made at startup, once the keys are in the environment
+SIGNING_IN: set[asyncio.Task] = set()  # an Instacart sign-in window waiting for the cook
 
 
 class StillTimers(Timers):
@@ -84,6 +88,19 @@ async def process_request(connection: ServerConnection, request: Request) -> Res
         del response.headers["Content-Type"]
         response.headers["Content-Type"] = "application/json"
         return response
+    if url.path == "/shopper-frame":
+        # The shopping browser as it last looked, so the cook can watch it shop from the Shopping sheet.
+        frame = shopping.latest_frame
+        if frame is None:
+            return connection.respond(HTTPStatus.NOT_FOUND, "nothing yet\n")
+        return Response(
+            HTTPStatus.OK.value, "OK", Headers({"Content-Type": "image/jpeg", "Cache-Control": "no-store"}), frame
+        )
+    if url.path.startswith("/cart-shots/"):
+        file = shopping.SHOTS_DIR / Path(url.path).name  # .name keeps requests inside the folder
+        if not file.is_file():
+            return connection.respond(HTTPStatus.NOT_FOUND, "no picture\n")
+        return Response(HTTPStatus.OK.value, "OK", Headers({"Content-Type": "image/jpeg"}), file.read_bytes())
     if url.path.startswith("/step-files/"):
         file = STEP_PICTURES_DIR / Path(url.path).name  # .name keeps requests inside the folder
         if not file.is_file():
@@ -110,7 +127,14 @@ async def apply_action(toolbox: Toolbox, message: dict) -> dict | None:
     """
     try:
         return await _apply_action(toolbox, message)
-    except (KeyError, ValueError):
+    except Exception as e:
+        if (
+            message.get("action") == "show_shopper"
+        ):  # e.g. the shopping window was closed; the next conversation reopens it
+            logging.warning(f"couldn't show the shopping browser: {e}")
+            return None
+        if not isinstance(e, (KeyError, ValueError)):
+            raise
         logging.warning(f"ignored a tap on something that's gone: {message}")
         return None
 
@@ -120,7 +144,11 @@ async def _apply_action(toolbox: Toolbox, message: dict) -> dict | None:
         case "step":
             step = toolbox.kitchen.step(message["step_id"])
             toolbox.update_step(step.id, message["status"])
-            note = f"The user tapped '{step.text}' as {message['status']} in the app. Briefly tell them what's next."
+            note = (
+                f"The cook tapped '{step.title}' as {message['status']} in the app. The screen now shows what's next;"
+                " don't read it out. Say a few words only if they need something it doesn't show: a cue, a warning,"
+                " or what to do while something cooks. Otherwise say nothing."
+            )
             return {"type": "generate_reply", "system_message": f"[{note}]"}
         case "timer":
             label, change = message["label"], message["change"]
@@ -155,6 +183,62 @@ async def _apply_action(toolbox: Toolbox, message: dict) -> dict | None:
             toolbox.clear_all()
             note = "[The cook tapped Clear all: the plan, timers and conversation are gone. Start fresh; say nothing.]"
             return {"type": "add_system_message", "system_message": note}
+        case "kitchen":
+            # An edit in the Kitchen sheet: items with how much and where, or the setup (burners, skill, diet...).
+            fields = ["items", "burners", "ovens", "cooks", "skill", "dietary_notes", "cook_names", "store"]
+            changes = {k: message[k] for k in fields if k in message}
+            toolbox.update_kitchen(**changes)
+            note = f"[The cook edited their kitchen in the app: {json.dumps(changes)}. Say nothing about it.]"
+            return {"type": "add_system_message", "system_message": note}
+        case "serve":
+            toolbox.set_serve_time(message["at"])
+            when = f"to {message['at']}" if message["at"] else "off"
+            note = f"[The cook set the serve time {when} in the app; the plan has moved to fit. Say nothing about it.]"
+            return {"type": "add_system_message", "system_message": note}
+        case "forget_item":
+            del toolbox.kitchen.inventory[message["name"]]
+            toolbox.save()
+            note = (
+                f"[The cook removed '{message['name']}' from their kitchen in the app; it's unknown now. Say nothing.]"
+            )
+            return {"type": "add_system_message", "system_message": note}
+        case "ingredients":
+            # An edit to a dish's ingredient list from the screen (a rename is a remove and an add).
+            toolbox.update_ingredients(message["dish"], message.get("items"), message.get("remove"))
+            changes = {k: message[k] for k in ("items", "remove") if message.get(k)}
+            note = f"[The cook edited the ingredients for {message['dish']} in the app: {json.dumps(changes)}. Say nothing.]"
+            return {"type": "add_system_message", "system_message": note}
+        case "open_cart":
+            # A store's own cart lives in the shopping browser: open it as a window to review and pay.
+            if not str(message.get("url", "")).startswith("https://"):
+                return None
+            SIGNING_IN.add(task := asyncio.create_task(shopping.show_cart(message["url"])))
+            task.add_done_callback(SIGNING_IN.discard)
+            return None
+        case "clear_carts":
+            toolbox.clear_carts(message.get("store"), message.get("at"))
+            return {
+                "type": "add_system_message",
+                "system_message": "[The cook cleared the shopping list. Say nothing.]",
+            }
+        case "clear_finished":
+            toolbox.clear_plan(None)
+            toolbox.kitchen.finished_at = None
+            toolbox.save()
+            return {
+                "type": "add_system_message",
+                "system_message": "[The cook cleared the finished meal. Say nothing.]",
+            }
+        case "close_how":
+            toolbox.kitchen.how_to = None
+            toolbox.save()
+            return {"type": "add_system_message", "system_message": "[The cook closed the how-to card. Say nothing.]"}
+        case "show_shopper":
+            # The local shopping browser runs headless; for the one-time sign-in it opens as a window, and goes back
+            # to headless once the cook's through. That takes minutes, so it runs on its own.
+            SIGNING_IN.add(task := asyncio.create_task(sign_in()))
+            task.add_done_callback(SIGNING_IN.discard)
+            return None
         case "clear_dish":
             toolbox.clear_plan(message["dish"])
             note = f"[The cook cleared {message['dish']} from the plan in the app. Say nothing about it.]"
@@ -186,42 +270,65 @@ async def handle_browser(browser: ServerConnection, args: argparse.Namespace) ->
     # /ws?talk=0 is the screen alone; plain /ws is a conversation with Basil, which starts only when the cook asks.
     if urllib.parse.urlsplit(browser.request.path).query == "talk=0":
         return await handle_screen(browser, Path(args.kitchen))
-    session: Session | None = None
+    kitchen_path = Path(args.kitchen)
+    # The Phonic conversation behind this tab. When it gets long it's swapped for a fresh one, briefed with the recap,
+    # while the tab, the mic and the screen carry on. None for the moment of the swap.
+    current: dict[str, Session | None] = {"session": None}
 
     async def forward(event: dict) -> None:
         await browser.send(json.dumps(event))
-        if event["type"] in STATE_CHANGING_EVENTS:
-            await push_state(browser, session)
+        if event["type"] in STATE_CHANGING_EVENTS and current["session"] is not None:
+            await push_state(browser, current["session"])
 
     async def read_browser() -> None:
         async for raw in browser:
             message = json.loads(raw)
-            match message["type"]:
-                case "audio":
+            session = current["session"]
+            if session is None:
+                # Mid-swap: a tap still lands on the saved kitchen; a moment of audio is dropped.
+                if message["type"] == "action" and message["action"] != "buy_missing":
+                    toolbox = saved_toolbox(kitchen_path)
+                    await apply_action(toolbox, message)
+                    await browser.send(json.dumps({"type": "state", **toolbox.snapshot()}))
+                continue
+            try:
+                if message["type"] == "audio":
                     await session.send_audio(message["audio"])
-                case "action":
+                elif message["type"] == "action":
                     await handle_action(browser, session, message)
+            except ConnectionClosed:
+                if browser.state.name != "OPEN":
+                    raise  # the tab itself went away
+                # otherwise it was the old conversation closing during a swap; this message goes with it
 
-    session_args = (args.voice, args.speed, instacart(args), advisor(), args.api_base)
+    quiet = "quiet=1" in urllib.parse.urlsplit(browser.request.path).query
+    reading = asyncio.create_task(read_browser())
     try:
-        async with open_session(Path(args.kitchen), forward, *session_args) as session:
-            # Stop when either side goes away: the tab closes, or Phonic ends the conversation.
-            reading = asyncio.create_task(read_browser())
-            ended = asyncio.create_task(session.ended.wait())
-            await asyncio.wait([reading, ended], return_when=asyncio.FIRST_COMPLETED)
-            for task in [reading, ended]:
-                task.cancel()
-            if reading.done() and not reading.cancelled():
-                reading.result()
+        while True:
+            session_args = (args.voice, args.speed, instacart(args), advisor(), args.api_base, quiet, args.fresh_after)
+            async with open_session(kitchen_path, forward, *session_args) as session:
+                current["session"] = session
+                # Stop when either side goes away (the tab closes, or Phonic ends it), or go again for a fresh one.
+                ended = asyncio.create_task(session.ended.wait())
+                fresh = asyncio.create_task(session.fresh_due.wait())
+                await asyncio.wait([reading, ended, fresh], return_when=asyncio.FIRST_COMPLETED)
+                current["session"] = None
+                again = fresh.done() and not reading.done() and not ended.done()
+                for task in [ended, fresh]:
+                    task.cancel()
+            if not again:
+                break
+            quiet = True  # the fresh one picks up silently, without a greeting or a "where were we"
     except ConnectionClosed:
         pass  # the tab closed or the server is shutting down; state is saved as it changes, so nothing is lost
+    finally:
+        reading.cancel()
 
 
 async def run(args: argparse.Namespace) -> None:
     global STEP_PICTURES
-    # Both keys are optional: without Claude there's no vetting (so no real photos), without OpenAI no illustrations.
-    claude = anthropic.AsyncAnthropic() if "ANTHROPIC_API_KEY" in os.environ else None
-    STEP_PICTURES = StepPictures(STEP_PICTURES_DIR, claude, os.environ.get("OPENAI_API_KEY"))
+    # Step pictures are generated with OpenAI (none without a key).
+    STEP_PICTURES = StepPictures(STEP_PICTURES_DIR, os.environ.get("OPENAI_API_KEY"))
     # Only pages served from localhost (on any port, so SSH forwarding to another local port works) may connect;
     # this stops other sites open in the browser from driving the agent, and its orders, through localhost.
     origins = [re.compile(r"http://(localhost|127\.0\.0\.1)(:\d+)?")]
@@ -240,6 +347,14 @@ async def run(args: argparse.Namespace) -> None:
         await server.serve_forever()
 
 
+def stopped_from_outside(*_) -> None:
+    """Something outside stopped the server (it would exit 143): say so, show what it was in the middle of, and stop
+    the way Ctrl-C does."""
+    logging.error("Received SIGTERM from outside the server; stopping. It was doing:")
+    faulthandler.dump_traceback(all_threads=True)
+    raise KeyboardInterrupt
+
+
 def main() -> None:
     load_dotenv(HERE / ".env")
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -248,15 +363,23 @@ def main() -> None:
     parser.add_argument("--kitchen", default=str(HERE / "kitchen.json"), help="where pantry, plan and timers persist")
     parser.add_argument("--api-base", default="wss://api.phonic.ai")
     parser.add_argument("--voice", default="jerome")
-    parser.add_argument("--speed", type=float, default=1.5, help="speaking speed, 0.5 to 1.5")
+    parser.add_argument(
+        "--fresh-after",
+        type=int,
+        default=5,
+        help="start a fresh Phonic conversation (briefed with a recap) after this many turns, at the next pause; 0 never",
+    )
+    parser.add_argument("--speed", type=float, default=1.15, help="speaking speed, 0.5 to 1.5")
     parser.add_argument(
         "--instacart",
-        choices=["auto", "off", "browser"],
+        choices=["auto", "off", "browser", "local"],
         default="auto",
-        help="fill your Instacart cart with a browser agent in the shopper/ sandbox (needs ANTHROPIC_API_KEY);"
-        " auto turns it on when the sandbox and key are there",
+        help="fill your Instacart cart with a browser agent (needs ANTHROPIC_API_KEY): 'browser' drives the Docker"
+        " sandbox in shopper/, 'local' a Chrome window of its own on this computer; auto uses the sandbox if it's"
+        " running, else local Chrome",
     )
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
+    signal.signal(signal.SIGTERM, stopped_from_outside)
     # Per-request HTTP and connection lines from websockets are noise here; keep its warnings and errors.
     logging.getLogger("websockets").setLevel(logging.WARNING)
     try:

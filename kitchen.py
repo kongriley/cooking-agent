@@ -1,6 +1,7 @@
 """Kitchen state (what's in it, the cook's setup, the cooking plan) and the plan scheduler."""
 
 import json
+import re
 import time
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
@@ -14,9 +15,14 @@ StepStatus = Literal["pending", "in_progress", "done"]
 # Enough of the recent conversation for a reconnected agent to pick up the thread.
 HISTORY_LIMIT = 30
 
-# Beginners take longer on hands-on work and shouldn't juggle as many things at once.
+# Beginners take longer on hands-on work and shouldn't juggle as many things at once. The juggling limit is per
+# cook: two people can keep more going than one.
 HANDS_ON_SPEED = {"beginner": 1.5, "intermediate": 1.0, "advanced": 0.8}
 MAX_PARALLEL_STEPS = {"beginner": 2, "intermediate": 3, "advanced": 4}
+# How many times to pull a late plan earlier and try again.
+RELEASE_PASSES = 4
+# An oven takes two things at once (two racks); a burner, one pot.
+OVEN_RACKS = 2
 
 
 @dataclass
@@ -28,6 +34,8 @@ class Profile:
     cooks: int | None = None
     skill: Skill | None = None
     dietary_notes: str = ""
+    cook_names: list[str] = field(default_factory=list)  # who the cooks are, in order; the first is at the screen
+    store: str | None = None  # their Instacart store, once they've said it
 
     def for_planning(self) -> "Profile":
         """Fill unknowns with a typical home kitchen so a plan can still be scheduled."""
@@ -37,7 +45,16 @@ class Profile:
             cooks=TYPICAL.cooks if self.cooks is None else self.cooks,
             skill=self.skill or TYPICAL.skill,
             dietary_notes=self.dietary_notes,
+            cook_names=self.cook_names,
+            store=self.store,
         )
+
+    def cook_name(self, index: int | None) -> str | None:
+        """What to call a cook; None when there's only one, since then nobody needs telling apart."""
+        cooks = self.for_planning().cooks
+        if index is None or cooks < 2:
+            return None
+        return self.cook_names[index] if index < len(self.cook_names) else f"Cook {index + 1}"
 
     def assumed(self) -> dict:
         """The typical values standing in for what the cook hasn't told us."""
@@ -62,6 +79,8 @@ class Step:
     status: StepStatus = "pending"
     started_at: float | None = None
     uses: list[str] = field(default_factory=list)  # names from the dish's ingredient list
+    cook: int | None = None  # which cook's hands it's in, once a hands-on step is started
+    cue: str | None = None  # no longer set; kept so plans saved when steps had cue clips still load
 
 
 @dataclass
@@ -72,6 +91,8 @@ class Timer:
     alert: str
     step_id: str | None = None
     paused_left: float | None = None  # seconds remaining while paused; None while running
+    follows: str | None = None  # the timer this one starts after; while set, it's queued and fire_at means nothing
+    kind: str = "timer"  # "timer" rings and shows a dial; "reminder" is something Basil says at a set time
 
 
 @dataclass
@@ -86,6 +107,9 @@ class Kitchen:
     orders: list[dict] = field(default_factory=list)
     history: list[dict] = field(default_factory=list)  # recent {"who": "cook" | "basil", "text": ...} lines
     finished_at: float | None = None  # when the last step of the plan was done
+    # When the cook wants to eat; the plan works back from it so everything lands together.
+    serve_at: float | None = None
+    how_to: dict | None = None  # a how-to card on screen ("how do I use a moka pot"), until the cook closes it
 
     @classmethod
     def load(cls, path: Path) -> "Kitchen":
@@ -104,10 +128,12 @@ class Kitchen:
             inventory[name] = {"have": "none", "where": "pantry"}
         # Orders from before carts had a status were from retired fake stores; drop them.
         data["orders"] = [o for o in data.get("orders", []) if "status" in o]
-        steps = [
-            Step(**{"dish": legacy_dish, "title": s["id"].replace("_", " ").capitalize(), **s})
-            for s in data.get("steps", [])
-        ]
+        steps = drop_busywork(
+            [
+                Step(**{"dish": legacy_dish, "title": s["id"].replace("_", " ").capitalize(), **s})
+                for s in data.get("steps", [])
+            ]
+        )
         timers = [Timer(**{"seconds": max(t["fire_at"] - time.time(), 1), **t}) for t in data.get("timers", [])]
         rest = {
             f.name: data[f.name] for f in fields(cls) if f.name in data and f.name not in ("profile", "steps", "timers")
@@ -184,6 +210,29 @@ class Kitchen:
             raise KeyError(f"no dish {dish!r}; cooking: {self.dishes}")
         self.steps = [s for s in self.steps if dish is not None and s.dish != dish]
         self.recipes = {d: r for d, r in self.recipes.items() if dish is not None and d != dish}
+        if not self.steps:
+            self.serve_at = None
+
+
+# Steps that aren't cooking: gathering or checking what's needed. The ingredient list already covers that.
+BUSYWORK = re.compile(
+    r"\b(check|gather|get out|set out|lay out|collect|assemble|confirm|review|prepare)\b.{0,30}"
+    r"\b(ingredients?|tools?|equipment|inventory|supplies)\b|\bmise en place\b|\binventory\b",
+    re.IGNORECASE,
+)
+
+
+def is_busywork(title: str, step_id: str = "") -> bool:
+    return bool(BUSYWORK.search(title) or BUSYWORK.search(step_id.replace("_", " ")))
+
+
+def drop_busywork(steps: list[Step]) -> list[Step]:
+    """Leave out gather-and-check steps that haven't been done, rewiring whatever waited on one to what it waited on."""
+    gone = {s.id: s.after for s in steps if s.status == "pending" and is_busywork(s.title, s.id)}
+    for s in steps:
+        if s.id not in gone:
+            s.after = list(dict.fromkeys(d for dep in s.after for d in (gone.get(dep, [dep]))))
+    return [s for s in steps if s.id not in gone]
 
 
 @dataclass
@@ -191,6 +240,7 @@ class Slot:
     step: Step
     start: float  # minutes from now
     end: float
+    cook: int | None = None  # whose hands, for hands-on steps
 
 
 def duration(step: Step, profile: Profile) -> float:
@@ -199,18 +249,72 @@ def duration(step: Step, profile: Profile) -> float:
 
 
 def schedule(kitchen: Kitchen, now: float) -> list[Slot]:
-    """Earliest-start list schedule of the unfinished steps under burner/oven/cook/attention limits.
+    """When each unfinished step happens, and whose hands it's in, under burner/oven/cook/attention limits.
 
-    Ready steps are prioritized by their longest remaining path to the end of the plan, so long chains
-    (dough proofing, braises) start first and short side tasks fill the gaps.
+    With no serve time, everything starts as early as it can. With one, the plan works back from it, the way a good
+    host plans a dinner party: the same scheduler run on the reversed plan says how late each step can start and still
+    have every dish ready together, and those become the earliest each step is started. If there isn't time, it all
+    starts now and simply finishes late.
     """
     profile = kitchen.profile.for_planning()
     todo = {s.id: s for s in kitchen.steps if s.status != "done"}
-    children: dict[str, list[str]] = {sid: [] for sid in todo}
+    after = {sid: [d for d in s.after if d in todo] for sid, s in todo.items()}
+    release: dict[str, float] = {}
+    if kitchen.serve_at is not None:
+        pending = {sid: s for sid, s in todo.items() if s.status == "pending"}
+        before = {sid: [c for c in pending if sid in after[c]] for sid in pending}  # the plan, reversed
+        horizon = (kitchen.serve_at - now) / 60
+        for slot in _list_schedule(pending, before, [], {}, profile):
+            # Within a dish, each step follows straight on from the one before (the chicken rests the moment it's out,
+            # the potatoes are mashed while hot), so only the first steps of a dish, and waits on other dishes, hold back.
+            own = [d for d in after[slot.step.id] if todo[d].dish == slot.step.dish]
+            if not own:
+                release[slot.step.id] = max(horizon - slot.end, 0.0)
+    running = []
+    taken: set[int] = set()
     for s in todo.values():
-        for d in s.after:
-            if d in todo:
-                children[d].append(s.id)
+        if s.status == "in_progress":
+            elapsed = (now - s.started_at) / 60
+            cook = None
+            if s.hands_on:
+                free = [c for c in range(profile.cooks) if c not in taken]
+                cook = s.cook if s.cook is not None and s.cook not in taken else (free[0] if free else None)
+                taken.add(cook)
+            running.append(Slot(s, start=0.0, end=max(duration(s, profile) - elapsed, 0.0), cook=cook))
+    pending = {sid: s for sid, s in todo.items() if s.status == "pending"}
+    best = _list_schedule(pending, after, running, release, profile)
+    # Working back is a guess: going forward, hands can be busy just when a step was meant to start, while they sat
+    # idle earlier. If the plan comes out late, start everything that much earlier, so the waiting work fills those
+    # gaps, and keep whichever plan lands closest to the serve time.
+    for _ in range(RELEASE_PASSES if release else 0):
+        late = max((sl.end for sl in best), default=0) - horizon
+        if late <= 0.5:
+            break
+        release = {sid: max(r - late, 0.0) for sid, r in release.items()}
+        tried = _list_schedule(pending, after, running, release, profile)
+        if max((sl.end for sl in tried), default=0) >= max((sl.end for sl in best), default=0):
+            break
+        best = tried
+    return best
+
+
+def _list_schedule(
+    todo: dict[str, Step],
+    after: dict[str, list[str]],
+    running: list[Slot],
+    release: dict[str, float],
+    profile: Profile,
+) -> list[Slot]:
+    """Earliest-start list schedule of `todo` (with `running` already under way), no step before its release time.
+
+    Ready steps go in order of release time, then by their longest remaining path to the end of the plan, so long
+    chains (dough proofing, braises) start first and short side tasks fill the gaps.
+    """
+    children: dict[str, list[str]] = {sid: [] for sid in todo}
+    for sid in todo:
+        for d in after.get(sid, []):
+            if d in children:
+                children[d].append(sid)
 
     tail: dict[str, float] = {}
 
@@ -226,39 +330,46 @@ def schedule(kitchen: Kitchen, now: float) -> list[Slot]:
     for sid in todo:
         critical_path(sid)
 
-    capacity = {"burner": profile.burners, "oven": profile.ovens}
+    capacity = {"burner": profile.burners, "oven": profile.ovens * OVEN_RACKS}
+    attention = MAX_PARALLEL_STEPS[profile.skill] * profile.cooks
     finished_at: dict[str, float] = {}
-    running: list[Slot] = []
-    slots: list[Slot] = []
-    for s in todo.values():
-        if s.status == "in_progress":
-            elapsed = (now - s.started_at) / 60
-            slot = Slot(s, start=0.0, end=max(duration(s, profile) - elapsed, 0.0))
-            running.append(slot)
-            slots.append(slot)
-    pending = [s for s in todo.values() if s.status == "pending"]
+    running = list(running)
+    slots: list[Slot] = list(running)
+    pending = list(todo.values())
+    unfinished = set(todo) | {r.step.id for r in running}
 
     t = 0.0
     while pending:
         for slot in [r for r in running if r.end <= t]:
             running.remove(slot)
             finished_at[slot.step.id] = slot.end
-        ready = [s for s in pending if all(d not in todo or finished_at.get(d, float("inf")) <= t for d in s.after)]
-        ready.sort(key=lambda s: -tail[s.id])
+        ready = [
+            s
+            for s in pending
+            if release.get(s.id, 0.0) <= t
+            and all(d not in unfinished or finished_at.get(d, float("inf")) <= t for d in after.get(s.id, []))
+        ]
+        ready.sort(key=lambda s: (release.get(s.id, 0.0), -tail[s.id]))
         for s in ready:
-            in_use = [r.step for r in running]
-            if len(in_use) >= MAX_PARALLEL_STEPS[profile.skill]:
+            in_use = running
+            if len(in_use) >= attention:
                 break
-            if s.hands_on and sum(r.hands_on for r in in_use) >= profile.cooks:
+            cook = None
+            if s.hands_on:
+                busy = {r.cook for r in in_use if r.step.hands_on}
+                free = [c for c in range(profile.cooks) if c not in busy]
+                if not free:
+                    continue
+                cook = free[0]
+            if s.equipment != "none" and sum(r.step.equipment == s.equipment for r in in_use) >= capacity[s.equipment]:
                 continue
-            if s.equipment != "none" and sum(r.equipment == s.equipment for r in in_use) >= capacity[s.equipment]:
-                continue
-            slot = Slot(s, start=t, end=t + duration(s, profile))
+            slot = Slot(s, start=t, end=t + duration(s, profile), cook=cook)
             running.append(slot)
             slots.append(slot)
             pending.remove(s)
         if pending:
-            if not running:
+            later = [r.end for r in running if r.end > t] + [release[s.id] for s in pending if release.get(s.id, 0) > t]
+            if not later:
                 raise ValueError(f"steps {[s.id for s in pending]} can never start")
-            t = min((r.end for r in running if r.end > t), default=t)
+            t = min(later)
     return sorted(slots, key=lambda sl: (sl.start, sl.end))
