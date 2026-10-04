@@ -1,0 +1,83 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "basil-busy",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": [
+        "run",
+        "server.py",
+        "--port",
+        "8018",
+        "--instacart",
+        "off",
+        "--kitchen",
+        "/private/tmp/claude-501/-Users-rkong-cooking-agent/2cde5b10-a1cb-4377-92ca-3cdff4e0ec1a/scratchpad/empty.json"
+      ],
+      "port": 8018
+    },
+    {
+      "name": "stove-party",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "python3 /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/fixture.py party /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/party.json && uv run server.py --port 8030 --instacart off --kitchen /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/party.json"
+      ],
+      "port": 8030
+    },
+    {
+      "name": "stove-solo",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "python3 /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/fixture.py solo /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/solo.json && uv run server.py --port 8031 --instacart off --kitchen /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/solo.json"
+      ],
+      "port": 8031
+    },
+    {
+      "name": "stove-rung",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "python3 /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/fixture.py rung /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/rung.json && uv run server.py --port 8032 --instacart off --kitchen /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/rung.json"
+      ],
+      "port": 8032
+    },
+    {
+      "name": "stove-empty",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "python3 /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/fixture.py empty /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/empty.json && uv run server.py --port 8033 --instacart off --kitchen /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/empty.json"
+      ],
+      "port": 8033
+    },
+    {
+      "name": "stove-finished",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "python3 /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/fixture.py finished /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/finished.json && uv run server.py --port 8034 --instacart off --kitchen /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/finished.json"
+      ],
+      "port": 8034
+    },
+    {
+      "name": "stove-howto",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "python3 /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/fixture.py howto /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/howto.json && uv run server.py --port 8035 --instacart off --kitchen /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/howto.json"
+      ],
+      "port": 8035
+    },
+    {
+      "name": "stove-busy",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "python3 /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/fixture.py busy /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/busy.json && uv run server.py --port 8036 --instacart off --kitchen /private/tmp/claude-501/-Users-rkong-cooking-agent/aa149e68-2126-4bf3-b71b-9813a8687720/scratchpad/busy.json"
+      ],
+      "port": 8036
+    }
+  ]
+}

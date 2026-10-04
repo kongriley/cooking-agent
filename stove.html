@@ -1,0 +1,1714 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Basil</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='none' stroke='%234d7cff' stroke-width='2.5'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700&family=IBM+Plex+Mono:wght@500;700&display=swap">
+<style>
+  /* The stove: the screen is the cook's own range, seen from above. What to do now is written on the glass to the
+     left, in type you can read across the room; the burners, oven and counter on the right show everything that's
+     cooking, where, and for how long. Basil is the pilot light. */
+  :root {
+    --bg: #ebe7dd; --top: #f6f4ee; --line: #cdc7b9; --line-2: #b9b2a2; --ink: #161714; --muted: #77746b;
+    --pan: #262826; --pan-2: #323532; --pan-ink: #f4f1e8; --pan-muted: #9c9a92;
+    --flame: #3d6df2; --flame-2: #86a6ff; --hot: #f07a2a; --alarm: #e5432a; --glow: #ff9a4a;
+    --d0: #c8673d; --d1: #2f8a76; --d2: #b48a1c; --d3: #7a62c2; --d4: #3a72c0; --d5: #b8507a; --d6: #5f8f33; --d7: #8f6c4f;
+    --display: "Bricolage Grotesque", ui-rounded, "Avenir Next", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --ease: cubic-bezier(.2, .9, .25, 1); --spring: cubic-bezier(.3, 1.5, .5, 1);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0c0b; --top: #121412; --line: #262a26; --line-2: #343934; --ink: #f2eee4; --muted: #8b8f87;
+      --pan: #262926; --pan-2: #303430; --pan-ink: #f4f1e8; --pan-muted: #8f938b;
+      --flame: #4f7fff; --flame-2: #9db6ff; --hot: #ff8a3a; --alarm: #ff5436; --glow: #ff9a4a;
+      --d0: #e58c66; --d1: #6dbaa7; --d2: #d9b456; --d3: #a593e6; --d4: #7eaaea; --d5: #df7fa3; --d6: #96c56e; --d7: #c7a283;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0c0b; --top: #121412; --line: #262a26; --line-2: #343934; --ink: #f2eee4; --muted: #8b8f87;
+    --pan: #262926; --pan-2: #303430; --pan-ink: #f4f1e8; --pan-muted: #8f938b;
+    --flame: #4f7fff; --flame-2: #9db6ff; --hot: #ff8a3a; --alarm: #ff5436; --glow: #ff9a4a;
+    --d0: #e58c66; --d1: #6dbaa7; --d2: #d9b456; --d3: #a593e6; --d4: #7eaaea; --d5: #df7fa3; --d6: #96c56e; --d7: #c7a283;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--display); overflow: hidden;
+    display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 6fr); grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: clamp(24px, 4vw, 64px);
+    padding-block: max(18px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-bottom));
+    padding-inline: clamp(16px, 4vw, 56px); user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+  button:focus-visible, a:focus-visible { outline: 2px solid var(--flame); outline-offset: 4px; border-radius: 10px; }
+  [hidden] { display: none !important; }
+  .mono { font-family: var(--mono); }
+
+  /* ---------- top bar: the wordmark, the time to eat, and the three ways into everything else ---------- */
+  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 24px; min-height: 40px; }
+  .wordmark { font-size: 22px; font-weight: 700; letter-spacing: -.045em; line-height: 1; font-variation-settings: "opsz" 96; }
+  .wordmark i { font-style: normal; color: var(--flame); }
+  #serve { margin-left: auto; display: flex; align-items: baseline; gap: 10px; padding: 6px 12px; margin-right: -12px; border-radius: 12px;
+    font: 500 13px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  #serve:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  #serve b { font: 700 22px var(--mono); letter-spacing: -.02em; color: var(--ink); text-transform: none; font-variant-numeric: tabular-nums; }
+  #serve .late { color: var(--alarm); }
+  nav { display: flex; gap: 4px; }
+  nav button { position: relative; padding: 8px 12px; border-radius: 10px; font: 500 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  nav button:hover, nav button[aria-expanded="true"] { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  nav button.dot::after { content: ""; position: absolute; top: 6px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--hot); }
+  nav button.busy::after { animation: breathe 1.2s ease-in-out infinite; }
+  #serve:not(:empty) + nav { margin-left: 8px; }
+  nav:first-child, #serve:empty + nav { margin-left: auto; }
+
+  /* ---------- the HUD: what to do now, written on the glass ---------- */
+  #hud { grid-column: 1; grid-row: 2; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 28px;
+    padding-block: 12px; overflow-y: auto; scrollbar-width: none; }
+  .obj { display: grid; gap: 14px; justify-items: start; }
+  .obj.enter { animation: obj-in .42s var(--ease) both; }
+  .obj.leave { animation: obj-out .22s ease-in both; }
+  @keyframes obj-in { from { transform: translateY(18px); opacity: 0; } }
+  @keyframes obj-out { to { transform: translateY(-14px); opacity: 0; } }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font: 500 12px/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .meta .dish { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+  .meta .dish::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--dish, var(--muted)); }
+  .who { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px; background: var(--ink); color: var(--bg);
+    font: 700 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+  .who.c1 { background: none; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .who.c2 { background: none; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); border-radius: 4px; }
+  .obj h1 { margin: 0; font-weight: 700; font-size: clamp(40px, 5.2vw, 84px); line-height: .98; letter-spacing: -.04em; text-wrap: balance; font-variation-settings: "opsz" 96; }
+  .instruction { margin: 0; display: grid; gap: .4em; max-width: 26ch; font-size: clamp(21px, 2.1vw, 30px); line-height: 1.25; text-wrap: pretty; }
+  .instruction p { margin: 0; }
+  .instruction b { font-weight: 700; }
+  .instruction .cue { color: var(--muted); }
+  .uses { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; padding: 0; list-style: none; font: 500 13px var(--mono); letter-spacing: .02em; color: var(--muted); }
+  .uses .amt { color: var(--ink); margin-right: 6px; }
+  .uses .out { color: var(--alarm); }
+  .uses .out .amt { color: var(--alarm); }
+  .act { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 8px; }
+  .go { position: relative; display: inline-flex; align-items: center; gap: 14px; height: 64px; padding: 0 16px 0 34px; border-radius: 999px;
+    background: var(--ink); color: var(--bg); font-weight: 700; font-size: 22px; letter-spacing: -.01em;
+    transition: transform .14s var(--spring), background .2s; }
+  .go:hover { transform: translateY(-1px); }
+  .go:active { transform: scale(.95); }
+  .go kbd { display: grid; place-items: center; min-width: 32px; height: 32px; padding: 0 8px; border-radius: 9px; font: 500 15px var(--mono);
+    background: color-mix(in srgb, var(--bg) 16%, transparent); }
+  .go.alarm { background: var(--alarm); color: #fff; }
+  .go.pressed { animation: press .32s var(--spring); }
+  @keyframes press { 40% { transform: scale(.92); } }
+  .ghost { height: 52px; padding: 0 24px; border-radius: 999px; font-weight: 500; font-size: 18px; box-shadow: inset 0 0 0 1.5px var(--line-2); transition: box-shadow .15s, transform .14s var(--spring); }
+  .ghost:hover { box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .ghost:active { transform: scale(.95); }
+  .when { font: 500 clamp(28px, 3vw, 40px)/1 var(--mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .when small { margin-left: 10px; font: 500 13px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .obj.alarm h1 { color: var(--alarm); }
+  .obj.alarm .meta { color: var(--alarm); }
+  .back { font: 500 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); padding: 6px 0; }
+  .back:hover { color: var(--ink); }
+  /* Everyone else's work, small, under the main objective. */
+  .obj.small { gap: 10px; padding-top: 22px; border-top: 1px solid var(--line); width: 100%; }
+  .obj.small h1 { font-size: clamp(26px, 2.6vw, 36px); letter-spacing: -.03em; }
+  .obj.small .instruction { font-size: 18px; max-width: 34ch; }
+  .obj.small .go { height: 48px; font-size: 17px; padding: 0 12px 0 24px; }
+  .obj.small .go kbd { display: none; }
+  .obj.small .ghost { height: 44px; font-size: 16px; padding: 0 18px; }
+  .row-small { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; width: 100%; }
+  .row-small > div { display: grid; gap: 8px; min-width: 0; }
+  /* What's coming, so the wait shows what it's for. */
+  .next { list-style: none; margin: 0; padding: 18px 0 0; border-top: 1px solid var(--line); display: grid; gap: 4px; width: 100%; }
+  .next button { width: 100%; display: grid; grid-template-columns: 5.5em 10px minmax(0, 1fr); align-items: center; gap: 12px; padding: 6px 0; text-align: left; font-size: 17px; color: var(--muted); }
+  .next button:hover { color: var(--ink); }
+  .next small { font: 500 13px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+  .next i { width: 8px; height: 8px; border-radius: 50%; background: var(--dish); }
+  .next span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* An empty stove: the question, large. */
+  .hello { margin: 0; font-size: clamp(40px, 5vw, 76px); font-weight: 700; line-height: 1; letter-spacing: -.04em; text-wrap: balance; }
+  .hello.working { color: var(--muted); animation: breathe 1.6s ease-in-out infinite; }
+  .hello + .sub { margin: 0; font: 500 13px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+
+  /* ---------- the world: burners, oven, counter ---------- */
+  #world { grid-column: 2; grid-row: 2; min-height: 0; position: relative; display: grid; place-items: center; }
+  #world svg.stove { width: 100%; height: 100%; overflow: visible; }
+  .surface { fill: var(--top); stroke: var(--line); stroke-width: 1.5; }
+  .grate { stroke: var(--line-2); stroke-width: 7; stroke-linecap: round; fill: none; }
+  .cap { fill: var(--line); }
+  .ring-port { fill: none; stroke: var(--line-2); stroke-width: 1.5; stroke-dasharray: 2 7; }
+  .draw { stroke-dasharray: var(--len) var(--len); stroke-dashoffset: var(--len); animation: draw .9s var(--ease) forwards; animation-delay: var(--d, 0s); }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .fade-in { animation: fade .6s ease-out both; animation-delay: var(--d, 0s); }
+  @keyframes fade { from { opacity: 0; } }
+
+  .flame { fill: var(--flame); opacity: 0; transition: opacity .5s, fill .4s; }
+  .flame.core { fill: var(--flame-2); }
+  .on .flame { opacity: .95; animation: flick var(--t, .5s) ease-in-out infinite alternate; animation-delay: var(--dl, 0s); }
+  .on .flame.core { opacity: .9; }
+  .on .flame.out { opacity: .55; fill: var(--line-2); animation: none; }
+  .on .flame.core.out { opacity: 0; }
+  .low .flame { fill: var(--hot); }
+  .low .flame.core { fill: #ffd08a; }
+  .alarm .flame { fill: var(--alarm); }
+  .alarm .flame.core { fill: #ffb199; }
+  .paused .flame { opacity: .25; animation: none; }
+  @keyframes flick { from { transform: scale(1, .82); } to { transform: scale(1.06, 1.1); } }
+  .halo { fill: url(#halo); opacity: 0; transition: opacity .6s; }
+  .on .halo { opacity: 1; }
+  .alarm .halo { fill: url(#halo-hot); }
+
+  .pan { cursor: pointer; }
+  .pan .body { fill: var(--pan); }
+  .pan .well { fill: var(--pan-2); }
+  .pan .rim { fill: none; stroke: var(--dish); stroke-width: 3; opacity: .9; }
+  .pan .handle { fill: var(--pan); }
+  .pan .label { font: 700 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; fill: var(--pan-muted); text-anchor: middle; }
+  .pan .big { font: 500 38px var(--mono); letter-spacing: -.03em; fill: var(--pan-ink); text-anchor: middle; font-variant-numeric: tabular-nums; }
+  .pan .big.word { font: 700 22px var(--display); letter-spacing: -.02em; }
+  .pan .pic { opacity: .55; }
+  .pan .shade { fill: url(#shade); }
+  .pan-in { transform-box: fill-box; transform-origin: center; animation: pan-in .5s var(--spring) both; }
+  @keyframes pan-in { from { transform: translateY(-26px) scale(.7); opacity: 0; } }
+  .pan-out { transform-box: fill-box; transform-origin: center; animation: pan-out .32s ease-in both; }
+  @keyframes pan-out { to { transform: translateY(14px) scale(.85); opacity: 0; } }
+  .pop { transform-box: fill-box; transform-origin: center; animation: pop .34s var(--spring); }
+  @keyframes pop { 40% { transform: scale(1.08); } }
+  .rattle { transform-box: fill-box; transform-origin: center; animation: rattle .5s ease-in-out infinite; }
+  @keyframes rattle { 25% { transform: rotate(-2.2deg); } 75% { transform: rotate(2.2deg); } }
+  .steam path { fill: none; stroke: var(--muted); stroke-width: 3; stroke-linecap: round; opacity: 0; animation: steam 2.4s ease-out infinite; }
+  @keyframes steam { 0% { opacity: 0; transform: translateY(6px); } 30% { opacity: .55; } 100% { opacity: 0; transform: translateY(-34px); } }
+  .ghost-pan { fill: var(--top); stroke: var(--line-2); stroke-width: 2; stroke-dasharray: 3 9; stroke-linecap: round; }
+  .ghost-text { font: 500 13px var(--mono); letter-spacing: .1em; text-transform: uppercase; fill: var(--muted); text-anchor: middle; }
+  .ghost-when { font: 500 26px var(--mono); letter-spacing: -.02em; fill: var(--muted); text-anchor: middle; font-variant-numeric: tabular-nums; }
+  .reticle { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-dasharray: 10 14; stroke-linecap: round; animation: march 1.2s linear infinite; }
+  @keyframes march { to { stroke-dashoffset: -24; } }
+  .badge rect { fill: var(--ink); }
+  .badge text { font: 700 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; fill: var(--bg); text-anchor: middle; }
+  .badge.c1 rect, .badge.c2 rect { fill: var(--top); stroke: var(--ink); stroke-width: 2; }
+  .badge.c1 text, .badge.c2 text { fill: var(--ink); }
+
+  .oven-body { fill: var(--top); stroke: var(--line); stroke-width: 1.5; }
+  .oven-window { fill: var(--pan); }
+  .oven-glow { fill: url(#oven-glow); opacity: 0; transition: opacity 1.2s; }
+  .oven-element { fill: none; stroke: var(--line-2); stroke-width: 3; stroke-linejoin: round; transition: stroke .8s; }
+  .oven.hot .oven-element { stroke: var(--hot); filter: drop-shadow(0 0 4px var(--hot)); }
+  .oven-rack { stroke: var(--pan-2); stroke-width: 3; }
+  .oven-label { font: 700 12px var(--mono); letter-spacing: .16em; text-transform: uppercase; fill: var(--muted); }
+  .oven-read { font: 500 26px var(--mono); letter-spacing: -.02em; fill: var(--ink); text-anchor: end; font-variant-numeric: tabular-nums; }
+  .oven-handle { fill: var(--line-2); }
+  .tray .body { fill: var(--pan-2); stroke: var(--dish); stroke-width: 2.5; }
+  .tray text { fill: var(--pan-ink); }
+
+  .counter-line { stroke: var(--line); stroke-width: 1.5; }
+  .board .body { fill: var(--top); stroke: var(--line-2); stroke-width: 1.5; }
+  .board .tick-ring { fill: none; stroke: var(--line); stroke-width: 4; }
+  .board .tick-arc { fill: none; stroke: var(--hot); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  .board .label { font: 700 11px var(--mono); letter-spacing: .14em; text-transform: uppercase; fill: var(--muted); }
+  .board .title { font: 500 17px var(--display); fill: var(--ink); }
+  .board .big { font: 500 24px var(--mono); letter-spacing: -.02em; fill: var(--ink); font-variant-numeric: tabular-nums; }
+  .board.alarm .body { stroke: var(--alarm); stroke-width: 2.5; }
+  .board.alarm .big { fill: var(--alarm); }
+  .board.paused { opacity: .55; }
+  .board .dot { fill: var(--dish); }
+
+  /* ---------- bottom: Basil, the pilot light ---------- */
+  footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; min-height: 76px; }
+  #pilot { position: relative; flex: none; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--top); box-shadow: inset 0 0 0 1.5px var(--line-2); transition: box-shadow .3s, transform .15s var(--spring); touch-action: none; }
+  #pilot:hover { box-shadow: inset 0 0 0 1.5px var(--ink); }
+  #pilot:active { transform: scale(.94); }
+  #pilot svg { width: 64px; height: 64px; overflow: visible; }
+  #pilot .tick { stroke: var(--line-2); stroke-width: 2; stroke-linecap: round; }
+  #pilot .fl { transform-box: fill-box; transform-origin: 50% 100%; transition: opacity .3s; }
+  #pilot .fl-out { fill: var(--flame); }
+  #pilot .fl-in { fill: var(--flame-2); }
+  #pilot[data-mode="talking"] .fl-out, #pilot[data-mode="thinking"] .fl-out { fill: var(--hot); }
+  #pilot[data-mode="talking"] .fl-in, #pilot[data-mode="thinking"] .fl-in { fill: #ffd08a; }
+  #pilot[data-mode="asleep"] .fl, #pilot[data-mode="off"] .fl, #pilot[data-mode="ready"] .fl { opacity: 0; }
+  #pilot[data-mode="ready"] .fl.pilot-only { opacity: 1; }
+  #pilot .slash { stroke: var(--muted); stroke-width: 2; stroke-linecap: round; opacity: 0; }
+  #pilot[data-mode="off"] .slash { opacity: 1; }
+  #pilot .spark { fill: var(--hot); opacity: 0; }
+  #pilot[data-mode="asleep"] { animation: invite 2.6s ease-in-out infinite; }
+  @keyframes invite { 50% { box-shadow: inset 0 0 0 1.5px var(--line-2), 0 0 0 7px color-mix(in srgb, var(--flame) 14%, transparent); } }
+  #pilot[data-mode="you"] { box-shadow: inset 0 0 0 2px var(--flame), 0 0 0 8px color-mix(in srgb, var(--flame) 18%, transparent); }
+  #lines { min-width: 0; flex: 1; display: grid; gap: 2px; }
+  .line { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #you { font-size: 15px; color: var(--muted); }
+  #you.live { color: var(--ink); }
+  #basil { font-size: clamp(18px, 1.7vw, 22px); line-height: 1.35; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #basil i { font-style: normal; animation: fade .3s ease-out; }
+  #basil.pondering { color: var(--muted); }
+  #status { font: 500 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  #status.working { color: var(--ink); animation: breathe 1.6s ease-in-out infinite; }
+  .hint-key { margin-left: auto; flex: none; font: 500 12px var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .hint-key kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; margin: 0 4px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line-2); font: inherit; }
+  @keyframes breathe { 50% { opacity: .45; } }
+
+  /* ---------- toasts ---------- */
+  #toast { position: fixed; z-index: 6; left: 50%; bottom: max(100px, calc(env(safe-area-inset-bottom) + 100px)); transform: translateX(-50%);
+    display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; border-radius: 999px; background: var(--ink); color: var(--bg);
+    font-size: 15px; animation: toast .3s var(--spring); max-width: calc(100% - 32px); }
+  #toast b { font-weight: 700; }
+  #toast a, #toast button { padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--ink); background: var(--bg); text-decoration: none; }
+  #toast button.x { background: none; color: inherit; opacity: .6; padding: 6px; }
+  @keyframes toast { from { transform: translate(-50%, 12px); opacity: 0; } }
+
+  /* ---------- sheets: a drawer on the glass ---------- */
+  #veil { position: fixed; inset: 0; z-index: 4; background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(3px); animation: fade .2s; }
+  #sheet { position: fixed; z-index: 5; top: 12px; right: 12px; bottom: 12px; width: min(520px, calc(100% - 24px)); padding: 24px 26px 28px; overflow-y: auto;
+    background: var(--top); border-radius: 22px; box-shadow: 0 0 0 1px var(--line), 0 30px 80px -20px color-mix(in srgb, #000 40%, transparent);
+    display: grid; align-content: start; gap: 24px; animation: drawer .3s var(--ease); scrollbar-width: thin; }
+  @keyframes drawer { from { transform: translateX(28px); opacity: 0; } }
+  #sheet .top { display: flex; justify-content: space-between; align-items: center; }
+  #sheet h2 { margin: 0; font-size: 30px; letter-spacing: -.03em; }
+  #sheet .top button { width: 36px; height: 36px; border-radius: 50%; font-size: 16px; color: var(--muted); }
+  #sheet .top button:hover { color: var(--ink); background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  #sheet section { display: grid; gap: 10px; }
+  #sheet p { margin: 0; line-height: 1.45; }
+  .kicker { margin: 0; font: 500 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  #sheet .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  #sheet .row > button { font-size: 15px; color: var(--muted); }
+  #sheet .row > button:hover { color: var(--alarm); }
+  .pill { justify-self: start; padding: 9px 16px; border-radius: 999px; font-size: 15px; font-weight: 500; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-2); transition: background .2s, color .2s; text-decoration: none; }
+  .pill:hover { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .pill.solid { background: var(--ink); color: var(--top); box-shadow: none; font-weight: 700; }
+  .pill.danger:hover { color: var(--alarm); box-shadow: inset 0 0 0 1.5px var(--alarm); }
+  .pill.armed { background: var(--alarm); color: #fff; box-shadow: none; }
+  .serve-row { display: flex; align-items: baseline; gap: 12px; }
+  .serve-row label { font: 500 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .serve-time { position: relative; font: 700 30px var(--mono); letter-spacing: -.03em; font-variant-numeric: tabular-nums; padding: 2px 10px; margin-left: -10px; border-radius: 12px; }
+  .serve-time:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+  .serve-time.unset { font: 500 15px var(--display); color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-2); padding: 8px 16px; margin-left: 0; }
+  .serve-time input { position: absolute; inset: 0; opacity: 0; pointer-events: none; }
+  .verdict { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--muted); }
+  .verdict::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .verdict.behind { color: var(--alarm); }
+  .key { display: flex; flex-wrap: wrap; gap: 8px; }
+  .key button { display: flex; align-items: center; gap: 8px; max-width: 100%; padding: 7px 12px 7px 10px; border-radius: 999px; font-size: 14px; font-weight: 500; box-shadow: inset 0 0 0 1.5px var(--line-2); }
+  .key button[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--ink); }
+  .key .swatch { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--dish); }
+  .key .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 15em; }
+  .key .count { color: var(--muted); font: 500 12px var(--mono); }
+  .key.filtering button[aria-pressed="false"] { color: var(--muted); }
+  /* The run sheet: a lane of time, each step a bar in its dish's colour. */
+  .agenda { --time: 4.6em; position: relative; list-style: none; margin: 0; padding: 0; display: grid; }
+  .agenda::before { content: ""; position: absolute; left: calc(var(--time) + 14px + 5.25px); top: 22px; bottom: 22px; width: 1.5px; background: var(--line); }
+  .agenda li > * { width: 100%; display: grid; grid-template-columns: var(--time) 12px minmax(0, 1fr) auto; column-gap: 14px; align-items: center; text-align: left; }
+  .agenda .item button { padding: 9px 4px 9px 0; border-radius: 12px; }
+  .agenda .item button:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); }
+  .agenda .at { justify-self: end; font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .agenda .at small { font-size: 11px; margin-left: 2px; }
+  .agenda .now-at { color: var(--ink); font-weight: 700; }
+  .agenda .dot { position: relative; z-index: 1; width: 12px; height: 12px; border-radius: 50%; background: var(--top); box-shadow: inset 0 0 0 2px var(--dish); }
+  .agenda .now .dot, .agenda .cooking .dot { background: var(--dish); }
+  .agenda .cooking .dot { box-shadow: 0 0 0 4px color-mix(in srgb, var(--dish) 25%, transparent); }
+  .agenda .reminder .dot { border-radius: 2px; transform: rotate(45deg) scale(.8); box-shadow: inset 0 0 0 2px var(--flame); }
+  .agenda .what { display: grid; gap: 1px; min-width: 0; }
+  .agenda .what b { font-weight: 500; font-size: 16px; line-height: 1.3; }
+  .agenda .what span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .agenda .what .by { color: var(--ink); font-weight: 500; }
+  .agenda .here .dot { width: 8px; height: 8px; margin-left: 2px; background: var(--ink); box-shadow: 0 0 0 4px var(--top); }
+  .agenda .here .what b { font-weight: 400; color: var(--muted); }
+  .agenda .left { font: 500 13px var(--mono); color: var(--hot); font-variant-numeric: tabular-nums; }
+  .agenda .gap > div { padding: 6px 0; }
+  .agenda .gap span { grid-column: 3; font-size: 13px; color: var(--muted); font-style: italic; }
+  .agenda.filtered::before { display: none; }
+  .done-count { margin: 0; font-size: 15px; color: var(--muted); }
+  .shelf { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .stock { display: grid; grid-template-columns: 7em minmax(0, 1fr) 28px; gap: 16px; align-items: center; }
+  .stock b { font-size: 16px; font-weight: 400; }
+  .stock.out b, .stock.out input { color: var(--alarm); }
+  #sheet input { font: inherit; font-size: 15px; color: var(--ink); background: none; border: 0; border-radius: 0; padding: 7px 0; min-width: 0; box-shadow: inset 0 -1px 0 transparent; user-select: text; }
+  #sheet input::placeholder { color: var(--muted); opacity: .7; }
+  #sheet input:hover { box-shadow: inset 0 -1px 0 var(--line-2); }
+  #sheet input:focus { outline: none; box-shadow: inset 0 -1.5px 0 var(--ink); }
+  .stock input.have { color: var(--muted); font-family: var(--mono); font-size: 13px; }
+  .x { font-size: 14px; color: var(--muted); opacity: .5; padding: 4px; }
+  .x:hover { color: var(--alarm); opacity: 1; }
+  .setup { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); column-gap: 16px; row-gap: 12px; align-items: center; }
+  .setup > span { font: 500 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .stepper, .seg { display: flex; align-items: center; gap: 4px; justify-self: start; flex-wrap: wrap; }
+  .stepper b { min-width: 2.2em; text-align: center; font: 500 16px var(--mono); }
+  .stepper button, .seg button { padding: 5px 12px; border-radius: 999px; font-size: 15px; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--line-2); }
+  .stepper button:hover, .seg button:hover { color: var(--ink); }
+  .stepper button:disabled { opacity: .35; cursor: default; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--top); box-shadow: none; }
+  .setup input.wide { justify-self: stretch; }
+  .recipe { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: fit-content(40%) minmax(0, 1fr) 24px; column-gap: 16px; row-gap: 2px; }
+  .recipe li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; font-size: 16px; }
+  .recipe .amt { font: 500 13px var(--mono); color: var(--muted); }
+  .recipe li.out .name, .recipe li.out input { color: var(--alarm); }
+  .order { display: grid; gap: 4px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .order:last-of-type { border: 0; }
+  .order .actions { display: flex; gap: 8px; margin-top: 8px; }
+  .cart-title { font-size: 17px; font-weight: 500; }
+  .cart-items { margin: 2px 0 0; font-size: 14px; line-height: 1.45; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .order img { margin-top: 10px; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; object-position: top; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--line); }
+  .sub-meta { font-size: 14px; color: var(--muted); }
+
+  /* ---------- how-to: a card over the stove ---------- */
+  #howto { position: fixed; z-index: 3; inset: 0; display: grid; place-items: center; padding: 24px; background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(6px); animation: fade .25s; }
+  .howto { width: min(1100px, 100%); max-height: 100%; overflow-y: auto; display: grid; gap: 32px; padding: clamp(24px, 4vw, 48px); border-radius: 26px; background: var(--top); box-shadow: 0 0 0 1px var(--line), 0 40px 100px -30px rgb(0 0 0 / .45); animation: drawer .35s var(--ease); }
+  .howto-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 16px 32px; }
+  .howto h1 { margin: 0; font-size: clamp(40px, 5vw, 72px); letter-spacing: -.04em; line-height: 1; }
+  .watch { margin: 8px 0 0; font-size: 19px; }
+  .watch b { display: block; font: 700 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--alarm); }
+  .howto-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 28px 24px; }
+  .howto-steps li { display: grid; gap: 10px; align-content: start; }
+  .howto-steps figure { margin: 0; aspect-ratio: 3 / 2; border-radius: 14px; overflow: hidden; background: var(--line); }
+  .howto-steps figure.loading { animation: breathe 1.6s ease-in-out infinite; }
+  .howto-steps img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .howto-steps h3 { margin: 4px 0 0; display: flex; gap: 10px; font-size: 21px; line-height: 1.2; letter-spacing: -.01em; }
+  .howto-steps .n { flex: none; padding-top: 4px; font: 700 13px var(--mono); color: var(--muted); }
+  .howto-steps p { margin: 0; font-size: 17px; line-height: 1.4; }
+
+  /* ---------- narrow: the objective on top, the stove under it ---------- */
+  @media (max-width: 900px), (max-aspect-ratio: 1/1) {
+    body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; row-gap: 12px; }
+    #hud { grid-column: 1; grid-row: 2; justify-content: start; overflow: visible; padding-block: 8px 0; gap: 18px; }
+    #world { grid-column: 1; grid-row: 3; }
+    .obj h1 { font-size: clamp(34px, 9vw, 56px); }
+    .instruction { font-size: clamp(18px, 4.6vw, 24px); max-width: none; }
+    .next { display: none; }
+    .obj.small { padding-top: 14px; }
+    .obj.small .instruction, .obj.small .uses { display: none; }
+    .hint-key { display: none; }
+  }
+  @media (max-width: 640px) {
+    header { gap: 10px; }
+    nav button { padding: 8px 8px; letter-spacing: .06em; }
+    #serve { font-size: 0; gap: 0; padding: 6px 8px; }
+    #serve b { font-size: 18px; }
+    .go { height: 56px; font-size: 19px; padding: 0 12px 0 26px; }
+    .go kbd { display: none; }
+    .uses { font-size: 12px; }
+    footer { min-height: 64px; gap: 14px; }
+    #pilot { width: 56px; height: 56px; } #pilot svg { width: 56px; height: 56px; }
+    #basil { font-size: 17px; }
+    .howto-steps { grid-template-columns: 1fr !important; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } .draw { stroke-dashoffset: 0; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="wordmark" aria-label="Basil">basil<i>.</i></span>
+  <button id="serve" hidden aria-label="The plan"></button>
+  <nav id="nav" aria-label="More"></nav>
+</header>
+<main id="hud" aria-live="polite"></main>
+<div id="world" aria-hidden="true"></div>
+<footer>
+  <button id="pilot" data-mode="asleep" aria-label="Talk to Basil">
+    <svg viewBox="-32 -32 64 64" aria-hidden="true">
+      <g id="pilot-ticks"></g>
+      <g class="fl" id="fl-outer"><path class="fl-out" d="M0 10 C-9 10 -11 2 -8 -4 C-6 -8 -3 -10 -2 -16 C2 -12 4 -10 7 -5 C10 1 9 10 0 10 Z"/></g>
+      <g class="fl" id="fl-inner"><path class="fl-in" d="M0 10 C-4 10 -5 5 -3 1 C-2 -1 -1 -3 0 -6 C2 -3 3 -1 4 2 C5 6 4 10 0 10 Z"/></g>
+      <path class="slash" d="M-12 -12 L12 12"/>
+    </svg>
+  </button>
+  <div id="lines">
+    <p class="line" id="status" hidden></p>
+    <p class="line" id="you" hidden></p>
+    <p class="line" id="basil" hidden></p>
+  </div>
+  <span class="hint-key" id="hint-key"></span>
+</footer>
+<div id="toast" role="status" hidden></div>
+<div id="veil" hidden></div>
+<aside id="sheet" hidden></aside>
+<div id="howto" hidden></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+// Text always goes in via textContent, so nothing the model writes can inject markup.
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === false || v == null) continue;
+    k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+  }
+  el.append(...kids.flat().filter((k) => k != null && k !== false));
+  return el;
+}
+const NS = "http://www.w3.org/2000/svg";
+function s(tag, attrs = {}, ...kids) {
+  const el = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === false || v == null) continue;
+    k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v);
+  }
+  el.append(...kids.flat().filter((k) => k != null && k !== false));
+  return el;
+}
+const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const RATE = 16000, FRAME = 320; // 20 ms frames; the API rejects chunks over 40 ms
+let ws = null, screen = null, ctx, mic, muted = false, state = null, stateAt = 0;
+let talking = false, hearing = false, thinking = false, consulting = false, playhead = 0;
+const playing = new Set();
+const rang = new Map(); // timer label -> {at, step_id}
+let closedBecause = "";
+let viewing = null; // a step the cook tapped to look at; null follows what's due
+
+// ---------- connection, audio ----------
+// Two connections: the screen's own, always open, which shows the saved kitchen and takes taps; and the conversation
+// with Basil, which starts only from the pilot light. While a conversation is open, it carries both.
+function connectScreen() {
+  screen = new WebSocket(`ws://${location.host}/ws?talk=0`);
+  screen.onopen = refresh;
+  screen.onmessage = (e) => { if (!ws) onEvent(JSON.parse(e.data)); };
+  screen.onclose = () => setTimeout(connectScreen, 1000);
+}
+function refresh() { if (screen?.readyState === 1) screen.send(JSON.stringify({ type: "refresh" })); }
+connectScreen();
+
+// How Basil listens: always on, tap to start and mute, or hold (the pilot or Space) to talk.
+const ALWAYS_KEY = "basil.alwaysOn", HOLD_KEY = "basil.pushToTalk";
+let alwaysOn = false, pushToTalk = false, holding = false, retryMs = 1000;
+const stayConnected = () => alwaysOn || pushToTalk;
+try { alwaysOn = localStorage.getItem(ALWAYS_KEY) === "1"; pushToTalk = !alwaysOn && localStorage.getItem(HOLD_KEY) === "1"; } catch {}
+function setListen(how) {
+  const wasHold = pushToTalk;
+  alwaysOn = how === "always"; pushToTalk = how === "hold";
+  try { localStorage.setItem(ALWAYS_KEY, alwaysOn ? "1" : "0"); localStorage.setItem(HOLD_KEY, pushToTalk ? "1" : "0"); } catch {}
+  if (ws && wasHold !== pushToTalk) ws.close();
+  else if (stayConnected() && !ws) wake(true);
+  pilot($("pilot").dataset.mode);
+  renderSheet();
+}
+const setAlwaysOn = (on) => setListen(on ? "always" : "tap");
+function hold(on) {
+  holding = on;
+  mic?.getAudioTracks().forEach((t) => (t.enabled = on));
+  refreshPilot();
+}
+document.addEventListener("pointerdown", () => {
+  sfxUnlock();
+  if (ctx?.state === "suspended") ctx.resume();
+  if (dictationBlocked && ws?.readyState === 1) { dictationBlocked = false; try { recognizer?.start(); } catch {} }
+});
+
+let outLevel = null, inLevel = null; // analysers: Basil's voice and the cook's, to move the pilot flame
+async function wake(quiet = false) {
+  if (ws) return;
+  ctx ||= new AudioContext({ sampleRate: RATE });
+  if (!outLevel) {
+    outLevel = ctx.createAnalyser(); outLevel.fftSize = 256; outLevel.connect(ctx.destination);
+  }
+  muted = false;
+  const opened = Date.now();
+  const query = [quiet && "quiet=1", pushToTalk && "ptt=1"].filter(Boolean).join("&");
+  ws = new WebSocket(`ws://${location.host}/ws${query ? `?${query}` : ""}`);
+  ws.onmessage = (e) => onEvent(JSON.parse(e.data));
+  ws.onopen = () => ignite();
+  ws.onclose = () => {
+    ws = null; talking = hearing = thinking = consulting = false; busyWith = null; renderBusy(); hush();
+    recognizer?.abort(); mic?.getTracks().forEach((t) => t.stop()); mic = null; inLevel = null;
+    pilot("asleep");
+    if (closedBecause) toast(h("span", {}, closedBecause));
+    refresh();
+    if (stayConnected()) {
+      retryMs = Date.now() - opened < 15000 ? Math.min(retryMs * 2, 60000) : 1000;
+      setTimeout(() => stayConnected() && !ws && wake(true), retryMs);
+    }
+    closedBecause = "";
+  };
+  pilot("listening");
+  try { await startMic(); startDictation(); } catch { pilot("off"); toast(h("span", {}, "No microphone")); }
+}
+
+let worklet = null;
+async function startMic() {
+  mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+  const src = `registerProcessor("mic", class extends AudioWorkletProcessor {
+    constructor() { super(); this.buf = new Int16Array(${FRAME}); this.n = 0; }
+    process([input]) {
+      for (const s of input[0] || []) {
+        this.buf[this.n++] = Math.max(-1, Math.min(1, s)) * 0x7fff;
+        if (this.n === ${FRAME}) { this.port.postMessage(this.buf.slice().buffer); this.n = 0; }
+      }
+      return true;
+    }
+  });`;
+  worklet ||= ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+  await worklet;
+  const node = new AudioWorkletNode(ctx, "mic");
+  node.port.onmessage = (e) => {
+    if (muted || ws?.readyState !== 1) return;
+    let str = "";
+    for (const b of new Uint8Array(e.data)) str += String.fromCharCode(b);
+    ws.send(JSON.stringify({ type: "audio", audio: btoa(str) }));
+  };
+  const source = ctx.createMediaStreamSource(mic);
+  source.connect(node);
+  inLevel = ctx.createAnalyser(); inLevel.fftSize = 256; source.connect(inLevel);
+  if (pushToTalk) mic.getAudioTracks().forEach((t) => (t.enabled = holding));
+  refreshPilot();
+}
+
+// The pilot: tap to start Basil (and then to mute); in hold mode, hold it or Space.
+$("pilot").onclick = () => {
+  if (pushToTalk) return;
+  if (!ws) return wake(); if (!mic) return; muted = !muted; mic.getAudioTracks().forEach((t) => (t.enabled = !muted)); refreshPilot();
+};
+$("pilot").addEventListener("pointerdown", (e) => {
+  if (!pushToTalk) return;
+  $("pilot").setPointerCapture(e.pointerId);
+  hold(true);
+  if (!ws) wake();
+});
+for (const end of ["pointerup", "pointercancel", "lostpointercapture"]) $("pilot").addEventListener(end, () => pushToTalk && holding && hold(false));
+
+function play(audio) {
+  const bin = atob(audio), n = bin.length >> 1, buf = ctx.createBuffer(1, n, RATE), out = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) { const v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); out[i] = (v > 32767 ? v - 65536 : v) / 32768; }
+  const node = ctx.createBufferSource(); node.buffer = buf; node.connect(outLevel);
+  playhead = Math.max(playhead, ctx.currentTime + 0.08);
+  node.start(playhead); playhead += buf.duration;
+  playing.add(node); node.onended = () => playing.delete(node);
+}
+function hush() { playing.forEach((n) => n.stop()); playing.clear(); playhead = 0; }
+
+// Live words while the cook talks: the browser's own recognition fills the gap before Phonic's transcript.
+let recognizer = null, dictationBlocked = false;
+function startDictation() {
+  const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!Recognition) return;
+  recognizer = new Recognition();
+  recognizer.continuous = true; recognizer.interimResults = true;
+  recognizer.onresult = (e) => {
+    if (!hearing) return;
+    let text = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) text += e.results[i][0].transcript;
+    said("you", text.trim(), true);
+  };
+  recognizer.onend = () => { if (ws?.readyState === 1 && !dictationBlocked) setTimeout(() => recognizer?.start(), 250); };
+  recognizer.onerror = (e) => { if (e.error === "not-allowed" || e.error === "service-not-allowed") dictationBlocked = true; };
+  try { recognizer.start(); } catch { dictationBlocked = true; }
+}
+
+const SLOW_TOOLS = ["think_it_through", "plan_dish"];
+let busyWith = null, busySince = 0, busyTicker = null;
+function busyLabel(tool, parameters = {}) {
+  if (tool === "plan_dish") return parameters.dish ? `Planning ${parameters.dish.toLowerCase()}…` : "Planning…";
+  return "Thinking…";
+}
+const THINKING_MS = 10000;
+let thinkingTimer = null;
+function setThinking(on) {
+  thinking = on;
+  clearTimeout(thinkingTimer);
+  if (on) thinkingTimer = setTimeout(() => setThinking(false), THINKING_MS);
+  refreshPilot();
+}
+const busyText = () => {
+  const secs = Math.floor((Date.now() - busySince) / 1000);
+  return busyWith && secs >= 3 ? `${busyWith} ${secs}s` : busyWith || "";
+};
+function tickBusy() { for (const el of document.querySelectorAll("[data-busy]")) el.textContent = busyText(); }
+function renderBusy() {
+  clearInterval(busyTicker);
+  busySince = busyWith ? Date.now() : 0;
+  if (busyWith) busyTicker = setInterval(tickBusy, 1000);
+  render();
+}
+
+function onEvent(m) {
+  switch (m.type) {
+    case "audio_chunk": play(m.audio); if (m.text) stream(m.text); break;
+    case "input_text": said("you", m.text, false); break;
+    case "tool_started":
+      if (SLOW_TOOLS.includes(m.tool_name)) { consulting = true; busyWith = busyLabel(m.tool_name, m.parameters); renderBusy(); }
+      break;
+    case "tool_result":
+      if (m.silent) setThinking(false);
+      if (m.tool_name === "show_on_screen" && m.output.ok) showOnScreen(m.output);
+      if (m.tool_name === "set_listening" && m.output.ok) setAlwaysOn(m.output.always);
+      if (SLOW_TOOLS.includes(m.tool_name)) { consulting = false; busyWith = null; renderBusy(); }
+      break;
+    case "assistant_started_speaking": talking = true; setThinking(false); said("basil", "", true); break;
+    case "assistant_finished_speaking": talking = false; break;
+    case "interrupted_response": talking = false; hush(); break;
+    case "user_started_speaking": hearing = true; hush(); said("you", "", true); break;
+    case "user_finished_speaking": hearing = false; $("you").classList.remove("live"); setThinking(true); break;
+    case "timer_fired": ring(m.label); break;
+    case "phonic_closed": closedBecause = m.reason; break;
+    case "state":
+      state = m; stateAt = Date.now();
+      if (!hearing && (m.said.cook || "") !== $("you").textContent) said("you", m.said.cook || "", false);
+      if (!talking && !consulting && (m.said.basil || "") !== basilText) said("basil", m.said.basil || "", false);
+      for (const [label, r] of rang) if (r.step_id && m.steps.find((x) => x.id === r.step_id)?.status === "done") rang.delete(label);
+      render();
+      break;
+  }
+  refreshPilot();
+}
+
+let basilText = "";
+function said(who, text, isLive) {
+  const el = $(who);
+  el.textContent = text;
+  if (who === "basil") basilText = text;
+  el.classList.toggle("live", isLive);
+  el.hidden = !text && !isLive;
+}
+function stream(text) {
+  text = text.replace(/\btool_[a-z_]+\b\.?/g, "");
+  if (!text) return;
+  if (basilText && !/\s$/.test(basilText) && !/^\s/.test(text) && (/[.!?,:;]$/.test(basilText) || /^[A-Z]/.test(text))) text = " " + text;
+  basilText += text;
+  $("basil").append(h("i", {}, text));
+  $("basil").hidden = false;
+}
+
+function pilot(mode) {
+  $("pilot").dataset.mode = mode;
+  $("pilot").setAttribute("aria-label", pushToTalk ? "Hold to talk to Basil" : mode === "asleep" ? "Talk to Basil" : "Mute or unmute");
+  $("pilot").title = pushToTalk ? "Hold to talk, or hold Space" : mode === "asleep" ? "Light the stove: talk to Basil" : "";
+  $("hint-key").replaceChildren(...(pushToTalk ? ["Hold", h("kbd", {}, "Space"), "to talk"] : []));
+}
+function refreshPilot() {
+  if (!ws || ws.readyState > 1) return;
+  if (!mic) return pilot("off");
+  const idle = pushToTalk && !holding ? "ready" : "listening";
+  pilot(muted ? "off" : holding ? "you" : talking ? "talking" : hearing ? "you" : thinking || consulting ? "thinking" : idle);
+}
+
+// The pilot flame moves with whoever's talking: steady and small while listening, tall with your voice, orange
+// and dancing with Basil's.
+const levelBuf = new Uint8Array(256);
+const level = (an) => { if (!an) return 0; an.getByteTimeDomainData(levelBuf); let m = 0; for (const v of levelBuf) m = Math.max(m, Math.abs(v - 128)); return m / 128; };
+let flameY = 0.6, flameX = 1;
+function animatePilot(t) {
+  const mode = $("pilot").dataset.mode;
+  let target = 0.55;
+  if (mode === "you") target = 0.75 + level(inLevel) * 2.2;
+  else if (mode === "talking") target = 0.8 + level(outLevel) * 2.4;
+  else if (mode === "thinking") target = 0.5 + 0.18 * Math.sin(t / 140) + 0.1 * Math.sin(t / 57);
+  else if (mode === "listening") target = 0.6 + 0.04 * Math.sin(t / 600);
+  target = Math.min(target, 1.6);
+  flameY += (target - flameY) * 0.25;
+  flameX = 1 + 0.06 * Math.sin(t / 90);
+  $("fl-outer").style.transform = `scale(${flameX}, ${flameY})`;
+  $("fl-inner").style.transform = `scale(${2 - flameX}, ${Math.max(0.3, flameY * 0.9)})`;
+  requestAnimationFrame(animatePilot);
+}
+for (let i = 0; i < 24; i++) {
+  const a = (i / 24) * 2 * Math.PI, r1 = 27, r2 = i % 6 ? 29 : 30.5;
+  $("pilot-ticks").append(s("line", { class: "tick", x1: r1 * Math.sin(a), y1: -r1 * Math.cos(a), x2: r2 * Math.sin(a), y2: -r2 * Math.cos(a) }));
+}
+requestAnimationFrame(animatePilot);
+
+// ---------- sound ----------
+// Small, quiet sounds, all made here: a click for a tap, a tock for done, the igniter for Basil arriving.
+let sfx = null;
+function sfxUnlock() { try { sfx ||= new AudioContext(); if (sfx.state === "suspended") sfx.resume(); } catch {} }
+function noise(dur) {
+  const b = sfx.createBuffer(1, Math.ceil(sfx.sampleRate * dur), sfx.sampleRate), d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  const n = sfx.createBufferSource(); n.buffer = b; return n;
+}
+function env(g, t, peak, a, d) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); }
+function click(at = 0, freq = 3200, vol = 0.05) {
+  if (!sfx) return;
+  const t = sfx.currentTime + at, n = noise(0.03), f = sfx.createBiquadFilter(), g = sfx.createGain();
+  f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 4;
+  env(g, t, vol, 0.002, 0.03); n.connect(f).connect(g).connect(sfx.destination); n.start(t); n.stop(t + 0.05);
+}
+function tone(freq, at, vol, dur, type = "sine") {
+  const t = sfx.currentTime + at, o = sfx.createOscillator(), g = sfx.createGain();
+  o.type = type; o.frequency.value = freq; env(g, t, vol, 0.006, dur);
+  o.connect(g).connect(sfx.destination); o.start(t); o.stop(t + dur + 0.05);
+}
+const sound = {
+  tap: () => click(0, 2400, 0.04),
+  done: () => { if (!sfx) return; tone(196, 0, 0.09, 0.12, "triangle"); tone(784, 0.06, 0.035, 0.5); tone(1175, 0.11, 0.025, 0.6); },
+  start: () => { if (!sfx) return; click(0); click(0.07); woosh(0.12, 0.6); },
+  ignite: () => { if (!sfx) return; click(0, 3600, 0.07); click(0.11, 3600, 0.07); click(0.22, 3600, 0.07); woosh(0.3, 0.9); },
+  ring: () => { if (!sfx) return; [[880, 0], [1175, 0.16], [880, 0.5], [1175, 0.66]].forEach(([f, at]) => tone(f, at, 0.07, 0.5)); },
+};
+function woosh(at, dur) {
+  const t = sfx.currentTime + at, n = noise(dur), f = sfx.createBiquadFilter(), g = sfx.createGain();
+  f.type = "lowpass"; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1400, t + 0.12); f.frequency.exponentialRampToValueAtTime(500, t + dur);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.09, t + 0.08); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  n.connect(f).connect(g).connect(sfx.destination); n.start(t); n.stop(t + dur);
+}
+// Basil arrives: the igniter clicks and the pilot catches.
+function ignite() {
+  sound.ignite();
+  const p = $("pilot");
+  p.animate([{ transform: "scale(1)" }, { transform: "scale(.9)" }, { transform: "scale(1.08)" }, { transform: "scale(1)" }], { duration: 520, easing: "ease-out" });
+}
+
+// ---------- helpers ----------
+function hello() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) return "Morning. What are we making?";
+  if (hour >= 11 && hour < 15) return "What's for lunch?";
+  if (hour >= 15 && hour < 22) return "What's for dinner?";
+  return "Late one. What are we making?";
+}
+function act(action, extra = {}) {
+  const message = JSON.stringify({ type: "action", action, ...extra });
+  if (ws?.readyState === 1) ws.send(message);
+  else if (ws) ws.addEventListener("open", () => ws.send(message), { once: true });
+  else if (screen?.readyState === 1) screen.send(message);
+}
+function hours(m) {
+  m = Math.max(1, Math.round(m));
+  if (m < 60) return `${m} min`;
+  return m % 60 ? `${Math.floor(m / 60)} hr ${m % 60} min` : `${m / 60} hr`;
+}
+// Short durations for small spaces: "12m", "1h 20".
+function short(m) {
+  m = Math.max(1, Math.round(m));
+  if (m < 60) return `${m}m`;
+  return m % 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}` : `${m / 60}h`;
+}
+function clock(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const hh = Math.floor(sec / 3600), mm = Math.floor((sec % 3600) / 60), ss = String(sec % 60).padStart(2, "0");
+  return hh ? `${hh}:${String(mm).padStart(2, "0")}:${ss}` : `${mm}:${ss}`;
+}
+const words = (label) => { const w = label.replaceAll("_", " "); return w.charAt(0).toUpperCase() + w.slice(1); };
+function listing(items) {
+  const text = items.length < 3 ? items.join(" & ") : `${items.slice(0, -1).join(", ")} & ${items.at(-1)}`;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+const none = (have) => have != null && /^(none|no|0|out|nothing)\b/i.test(String(have).trim());
+const atClock = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const dishes = () => [...new Set((state?.steps || []).map((x) => x.dish))];
+const dishColor = (d) => `var(--d${Math.max(0, dishes().indexOf(d)) % 8})`;
+const cookName = (st) => (state.cooks.length > 1 && st.hands_on && st.cook != null ? state.cooks[st.cook] : null);
+const unblocked = (st) => st.after.every((id) => (state.steps.find((x) => x.id === id)?.status ?? "done") === "done");
+const stepNumber = (st) => state.steps.filter((x) => x.dish === st.dish).indexOf(st) + 1;
+const sameWords = (a, b) => a.toLowerCase().replace(/[^a-z0-9]+/g, "") === b.toLowerCase().replace(/[^a-z0-9]+/g, "");
+function toast(...kids) {
+  const t = $("toast");
+  t.replaceChildren(...kids, h("button", { class: "x", "aria-label": "Dismiss", onclick: () => (t.hidden = true) }, "✕"));
+  t.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => (t.hidden = true), 8000);
+}
+
+// ---------- the plan ----------
+const READY_FOR_MS = 20 * 60 * 1000;
+function plan() {
+  const finished = state?.finished_at != null;
+  const eating = finished && Date.now() - state.finished_at * 1000 < READY_FOR_MS;
+  const steps = finished && !eating ? [] : state?.steps || [];
+  const open = steps.filter((x) => x.status !== "done");
+  const ready = open.filter((x) => x.status === "pending" && x.start === 0);
+  const hands = (state?.cooks || [null]).map((_, i) =>
+    ready.find((x) => x.hands_on && (x.cook ?? 0) === i) || open.find((x) => x.hands_on && x.status === "in_progress" && (x.cook ?? 0) === i));
+  const current = (hands[0]?.status === "pending" && hands[0]) || ready.find((x) => !x.hands_on) || hands[0] || hands.find(Boolean);
+  const running = open.find((x) => x.status === "in_progress");
+  const upcoming = open.filter((x) => x.status === "pending" && x.start > 0).sort((a, b) => a.start - b.start)[0];
+  const shown = steps.find((x) => x.id === viewing) || current || running || upcoming;
+  return { steps, open, ready, hands, current, running, upcoming, shown, eating };
+}
+const LATE_AFTER = 5;
+const readyAt = () => stateAt + Math.max(0, ...plan().open.map((x) => x.end ?? 0)) * 60000;
+const lateBy = () => (state?.serve_at && plan().open.length ? (readyAt() - state.serve_at * 1000) / 60000 : 0);
+
+// What the HUD shows, most urgent first: a timer that's gone off, then each cook's work, then what can be started.
+// With nothing to do yet, the next thing coming.
+function objectives() {
+  const out = [];
+  for (const [label, r] of rang) out.push({ kind: "rang", key: `rang:${label}`, label, r });
+  const { steps, open, ready, hands, current, upcoming, shown, eating } = plan();
+  if (viewing && shown) return [...out, { kind: "step", key: shown.id, s: shown, viewing: true }];
+  const many = (state?.cooks?.length || 1) > 1;
+  if (many) {
+    const nextFor = (i) => open.filter((x) => x.hands_on && x.status === "pending" && (x.cook ?? 0) === i && unblocked(x)).sort((a, b) => a.start - b.start)[0];
+    hands.forEach((x, i) => { const st = x || nextFor(i); if (st && !out.some((o) => o.s === st)) out.push({ kind: "step", key: st.id, s: st, cook: i }); });
+    for (const st of ready.filter((x) => !x.hands_on && !out.some((o) => o.s === x)).slice(0, 1)) out.push({ kind: "step", key: st.id, s: st, anyone: true });
+  } else if (current) out.push({ kind: "step", key: current.id, s: current });
+  if (!out.some((o) => o.kind === "step") && upcoming) out.push({ kind: "step", key: upcoming.id, s: upcoming });
+  if (!out.length && eating && steps.length) out.push({ kind: "eat", key: "eat" });
+  return out;
+}
+
+// ---------- shopping ----------
+const NOTICE_MS = 15 * 1000;
+const cartUrl = (o) => o.cart_url || "https://www.instacart.com/store";
+const VIEWER_URL = `http://${location.hostname}:6080/vnc.html?autoconnect=1&resize=scale`;
+const setAside = new Set();
+const itemName = (added) => added.split(":")[0].trim();
+function link(url, label, cls) { return h("a", { class: cls, href: url, target: "_blank", rel: "noopener" }, label); }
+function shopperLink(label, cls) {
+  if (state.shopping.viewer) return link(VIEWER_URL, label, cls);
+  if (label === "Watch") return h("button", { class: cls, onclick: () => openSheet("shopping") }, label);
+  return h("button", { class: cls, title: "Opens a window to sign in to Instacart; it closes itself once you're in", onclick: () => act("show_shopper") }, label);
+}
+function cartActions(o, cls) {
+  if (o.status === "needs_login") return [shopperLink("Sign in", cls)];
+  if (o.status === "filling") return state.shopping.viewer ? [shopperLink("Watch", cls)] : [];
+  if (o.status !== "ready") return [];
+  if (o.kind !== "site") return [link(cartUrl(o), "Review", cls)];
+  return [h("button", { class: cls, onclick: () => act("open_cart", { url: o.cart_url }) }, "Open")];
+}
+function storeName(o) {
+  const name = o.store || "Instacart";
+  if (!name.includes(".")) return name;
+  const base = name.split(".").slice(-2, -1)[0] || name;
+  return base.charAt(0).toUpperCase() + base.slice(1);
+}
+function cartTitle(o) {
+  const n = (o.in_cart?.length ? o.in_cart : o.status === "ready" ? o.added || [] : o.items).length;
+  return [storeName(o), n && `${n} item${n === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
+}
+function cartItems(o) {
+  if (o.status === "ready" && o.in_cart?.length) return listing(o.in_cart.map(itemName)).toLowerCase();
+  return listing(o.status === "ready" && o.kind !== "change" ? (o.added || []).map(itemName) : o.items).toLowerCase();
+}
+function cartLine(o) {
+  if (o.status === "filling") return "Shopping…";
+  if (o.status === "needs_login") return "Sign in to Instacart";
+  if (o.status === "interrupted") return "Stopped";
+  if (o.status === "failed") return "Couldn't shop";
+  const done = o.runs > 1 || o.kind === "change" ? "Updated" : "Ready";
+  return o.missing?.length ? `${done} · ${o.missing.length} not found` : done;
+}
+let noticed = new Set();
+function renderNotice() {
+  const done = (state?.carts || []).find((o) => ["ready", "needs_login", "failed"].includes(o.status) && !setAside.has(o.at) && !noticed.has(o.at)
+    && Date.now() - (o.done_at ?? o.at) * 1000 < NOTICE_MS);
+  if (!done) return;
+  noticed.add(done.at);
+  toast(h("span", {}, h("b", {}, storeName(done)), ` · ${cartLine(done)}`), ...cartActions(done, ""));
+}
+
+// What Basil puts on screen when asked, the same as the taps that do it.
+function showOnScreen({ showing, step_id, dish }) {
+  if (showing === "now" || (showing === "step" && !step_id)) { viewing = null; planDish = null; openSheet("nothing"); }
+  else if (showing === "nothing") { viewing = null; planDish = null; rang.clear(); for (const o of state?.carts || []) setAside.add(o.at); $("toast").hidden = true; openSheet("nothing"); }
+  else if (showing === "step") { viewing = step_id; openSheet("nothing"); }
+  else if (showing === "plan") { planDish = dish; openSheet("plan"); }
+  else openSheet(showing);
+  render();
+}
+
+// ---------- sheets ----------
+let sheetView = null;
+function openSheet(view) { sheetView = view === "nothing" ? null : view; renderNav(); renderSheet(); }
+$("veil").onclick = () => openSheet("nothing");
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches?.("input, textarea")) return;
+  if (e.key === "Escape") { if (sheetView) openSheet("nothing"); else if (viewing) backToNow(); }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); act("undo"); sound.tap(); }
+  if (e.key === "Enter" && !sheetView && !(e.target instanceof HTMLButtonElement || e.target instanceof HTMLAnchorElement)) {
+    const go = document.querySelector("#hud .obj:not(.leave) .go");
+    if (go) { e.preventDefault(); go.click(); }
+  }
+  if (!sheetView && e.key === "ArrowRight") look(1);
+  if (!sheetView && e.key === "ArrowLeft") look(-1);
+  if (pushToTalk && e.code === "Space" && !e.repeat) { e.preventDefault(); hold(true); if (!ws) wake(); }
+});
+document.addEventListener("keyup", (e) => { if (pushToTalk && e.code === "Space" && holding) { e.preventDefault(); hold(false); } });
+
+function renderNav() {
+  const carts = state?.carts || [];
+  const filling = carts.some((o) => o.status === "filling");
+  const chip = (view, label, cls = "") => h("button", { class: cls || false, "aria-expanded": String(sheetView === view),
+    onclick: () => { sound.tap(); openSheet(sheetView === view ? "nothing" : view); } }, label);
+  const { steps } = plan();
+  $("nav").replaceChildren(...[
+    steps.length > 0 && chip("plan", "Plan", lateBy() > LATE_AFTER ? "dot" : ""),
+    carts.length > 0 && chip("shopping", "Shop", filling ? "dot busy" : ""),
+    state && chip("kitchen", "Kitchen", state.shopping.on && state.shopping.signed_in === false ? "dot" : ""),
+  ].filter(Boolean));
+  // The time to eat, always in view once it's set; tapping it opens the plan.
+  const serve = $("serve");
+  serve.hidden = !state?.serve_at || !steps.length;
+  if (!serve.hidden) {
+    const late = lateBy();
+    serve.replaceChildren(h("span", { class: late > LATE_AFTER ? "late" : false }, late > LATE_AFTER ? `${short(late)} late` : "Eat"), h("b", {}, atClock(state.serve_at * 1000)));
+    serve.onclick = () => { sound.tap(); openSheet(sheetView === "plan" ? "nothing" : "plan"); };
+  }
+}
+
+const PLACES = [["fridge", "Fridge"], ["freezer", "Freezer"], ["pantry", "Pantry"], ["spices", "Spices"], ["tools", "Tools"]];
+function renderSheet() {
+  const sheet = $("sheet");
+  sheet.hidden = $("veil").hidden = !sheetView || !state;
+  if (sheet.hidden) return;
+  const typing = sheet.contains(document.activeElement) && document.activeElement.dataset.key ? document.activeElement : null;
+  const title = { plan: "Plan", shopping: "Shopping", kitchen: "Kitchen", ingredients: "Ingredients" }[sheetView];
+  let body;
+  if (sheetView === "shopping") {
+    body = state.carts.length ? [...state.carts.map((o) => h("div", { class: "order" },
+      h("div", { class: "row" }, h("span", { class: "cart-title" }, cartTitle(o)),
+        h("button", { class: "x", "aria-label": "Remove", onclick: () => act("clear_carts", { store: o.store }) }, o.status === "filling" ? "Stop" : "✕")),
+      h("span", { class: "sub-meta" }, cartLine(o)),
+      h("p", { class: "cart-items" }, cartItems(o)),
+      o.status === "filling" && !state.shopping.viewer && h("img", { alt: "The shopping browser", "data-live": "", src: `/shopper-frame?${Date.now()}`,
+        onerror: (e) => { e.target.style.visibility = "hidden"; }, onload: (e) => { e.target.style.visibility = ""; } }),
+      o.shot && o.status !== "filling" && h("img", { src: `/cart-shots/${o.shot}`, alt: "The cart" }),
+      h("div", { class: "actions" }, ...cartActions(o, "pill solid")))),
+      state.carts.some((o) => o.status !== "filling") && h("button", { class: "pill danger", onclick: () => act("clear_carts") }, "Clear")] : [];
+  } else if (sheetView === "plan") {
+    body = runSheet();
+  } else if (sheetView === "ingredients") {
+    body = dishes().map((d) => h("section", {}, h("p", { class: "kicker" }, d), ingredientList(d)));
+  } else {
+    const { profile: p, inventory } = state.kitchen;
+    const cooking = dishes();
+    const shelves = PLACES.map(([where, name]) => {
+      const items = Object.entries(inventory).filter(([, e]) => e.where === where);
+      return h("section", {}, h("p", { class: "kicker" }, name), h("ul", { class: "shelf" },
+        items.map(([item, e]) => h("li", { class: `stock${none(e.have) ? " out" : ""}` },
+          field({ class: "have", key: `have:${item}`, value: e.have, label: `How much ${item}` },
+            (have) => have && have !== e.have && act("kitchen", { items: [{ name: item, have, where }] })),
+          h("b", {}, item),
+          h("button", { class: "x", "aria-label": `Remove ${item}`, onclick: () => act("forget_item", { name: item }) }, "✕"))),
+        addRow(where, name)));
+    });
+    body = [
+      state.shopping.on && state.shopping.signed_in === false && h("section", {}, h("div", { class: "row" }, h("p", {}, "Instacart"), shopperLink("Sign in", "pill solid"))),
+      cooking.length > 0 && h("section", {}, h("p", { class: "kicker" }, "Cooking"), ...cooking.map((dish) =>
+        h("div", { class: "row" }, h("p", {}, dish), h("button", { onclick: () => act("clear_dish", { dish }) }, "Stop")))),
+      cooking.length > 0 && h("button", { class: "pill", onclick: () => openSheet("ingredients") }, "Ingredients"),
+      h("section", {}, h("p", { class: "kicker" }, "Setup"), setupGrid(p)),
+      ...shelves,
+      (state.steps.length > 0 || state.timers.length > 0 || basilText || $("you").textContent) && clearAll(),
+    ];
+  }
+  const scroll = sheet.scrollTop;
+  sheet.replaceChildren(h("div", { class: "top" }, h("h2", {}, title), h("button", { "aria-label": "Close", onclick: () => openSheet("nothing") }, "✕")),
+    ...[body].flat().filter(Boolean));
+  sheet.scrollTop = scroll;
+  tick();
+  const again = typing && sheet.querySelector(`[data-key="${CSS.escape(typing.dataset.key)}"]`);
+  if (again) { again.value = typing.value; again.focus(); try { again.setSelectionRange(typing.selectionStart, typing.selectionEnd); } catch {} }
+}
+
+function field({ class: cls, key, value = "", label, placeholder }, save) {
+  const input = h("input", { class: cls, "data-key": key, value, "aria-label": label, placeholder, autocomplete: "off", spellcheck: "false" });
+  input.addEventListener("blur", () => { if (input.isConnected && input.value.trim() !== value) save(input.value.trim()); });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") input.blur(); if (e.key === "Escape") { input.value = value; input.blur(); } });
+  return input;
+}
+function addRow(where, shelf) {
+  const what = h("input", { class: "what", "data-key": `add:${where}`, placeholder: `Add to ${shelf.toLowerCase()}`, "aria-label": `Add to ${shelf}`, autocomplete: "off" });
+  const have = h("input", { class: "have", "data-key": `addhave:${where}`, placeholder: "how much", "aria-label": "How much", autocomplete: "off" });
+  const add = () => {
+    const name = what.value.trim().toLowerCase();
+    if (!name) return;
+    act("kitchen", { items: [{ name, have: have.value.trim() || (where === "tools" ? "yes" : "some"), where }] });
+    what.value = have.value = "";
+    what.focus();
+  };
+  for (const input of [what, have]) input.addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
+  return h("li", { class: "stock add" }, have, what, h("span"));
+}
+function setupGrid(p) {
+  const stepper = (key, label, min) => {
+    const v = p[key];
+    const set = (n) => act("kitchen", { [key]: n });
+    return [h("span", {}, label), h("div", { class: "stepper" },
+      h("button", { "aria-label": `Fewer ${label.toLowerCase()}`, disabled: v == null || v <= min, onclick: () => set(v - 1) }, "−"),
+      h("b", { title: v == null ? "Not told yet" : false }, v ?? "?"),
+      h("button", { "aria-label": `More ${label.toLowerCase()}`, onclick: () => set((v ?? min) + 1) }, "+"))];
+  };
+  return h("div", { class: "setup" },
+    stepper("burners", "Burners", 0), stepper("ovens", "Ovens", 0), stepper("cooks", "Cooks", 1),
+    (p.cooks ?? 1) > 1 && [h("span", {}, "Who"), field({ class: "wide", key: "cooks", value: (p.cook_names || []).join(", "), label: "Who's cooking", placeholder: "You, Sam" },
+      (names) => act("kitchen", { cook_names: names.split(",").map((n) => n.trim()).filter(Boolean) }))],
+    h("span", {}, "Skill"), h("div", { class: "seg" }, ["beginner", "intermediate", "advanced"].map((skill) =>
+      h("button", { "aria-pressed": String(p.skill === skill), onclick: () => act("kitchen", { skill }) }, words(skill)))),
+    h("span", {}, "Basil"), h("div", { class: "seg" },
+      h("button", { "aria-pressed": String(alwaysOn), onclick: () => setListen("always") }, "Always on"),
+      h("button", { "aria-pressed": String(!alwaysOn && !pushToTalk), onclick: () => setListen("tap") }, "Tap"),
+      h("button", { "aria-pressed": String(pushToTalk), title: "Hold the pilot, or Space, to talk", onclick: () => setListen("hold") }, "Hold")),
+    h("span", {}, "Store"), field({ class: "wide", key: "store", value: p.store || "", label: "Instacart store", placeholder: "Your Instacart store" },
+      (store) => store && act("kitchen", { store })),
+    h("span", {}, "Diet"), field({ class: "wide", key: "diet", value: p.dietary_notes, label: "Diet", placeholder: "Allergies, likes, dislikes" },
+      (dietary_notes) => dietary_notes !== p.dietary_notes && act("kitchen", { dietary_notes })));
+}
+function clearAll() {
+  const button = h("button", { class: "pill danger" }, "Clear all");
+  let armed = null;
+  button.onclick = () => {
+    if (!armed) {
+      button.textContent = "Clear everything"; button.classList.add("armed");
+      armed = setTimeout(() => { armed = null; button.textContent = "Clear all"; button.classList.remove("armed"); }, 3000);
+      return;
+    }
+    clearTimeout(armed);
+    act("clear_all");
+    said("you", "", false); said("basil", "", false); rang.clear(); viewing = null;
+    openSheet("nothing");
+  };
+  return button;
+}
+// A dish's ingredients, amount first; missing ones red, with one tap to buy them. Amounts and names edit in place.
+function ingredientList(dish) {
+  const all = state.recipes[dish] || [];
+  const change = (extra) => act("ingredients", { dish, ...extra });
+  const missing = all.filter((i) => none(i.have));
+  const amount = h("input", { class: "amt", "data-key": `add-amt:${dish}`, placeholder: "how much", "aria-label": "How much", autocomplete: "off" });
+  const name = h("input", { "data-key": `add-name:${dish}`, placeholder: "Add", "aria-label": "Ingredient", autocomplete: "off" });
+  const add = () => { if (!name.value.trim()) return; change({ items: [{ name: name.value.trim(), amount: amount.value.trim() }] }); amount.value = name.value = ""; amount.focus(); };
+  for (const input of [amount, name]) input.addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
+  return [h("ul", { class: "recipe" },
+    all.map((i) => h("li", { class: none(i.have) ? "out" : false },
+      field({ class: "amt", key: `amt:${dish}:${i.name}`, value: i.amount, label: `How much ${i.name}`, placeholder: "—" }, (value) => change({ items: [{ name: i.name, amount: value }] })),
+      field({ key: `name:${dish}:${i.name}`, value: i.name, label: "Ingredient" }, (value) => change(value ? { remove: [i.name], items: [{ name: value, amount: i.amount }] } : { remove: [i.name] })),
+      h("button", { class: "x", "aria-label": `Remove ${i.name}`, onclick: () => change({ remove: [i.name] }) }, "✕"))),
+    h("li", {}, amount, name, h("span"))),
+    missing.length > 0 && state.shopping.on && h("button", { class: "pill solid", onclick: () => act("buy_missing", { dish }) }, "Buy what's missing")];
+}
+
+// ---------- the run sheet ----------
+let planDish = null;
+const FREE_GAP_MS = 20 * 60000;
+function runSheet() {
+  const { steps, open, shown } = plan();
+  const ds = dishes();
+  if (!ds.includes(planDish)) planDish = null;
+  const toTime = (ms) => { const d = new Date(ms); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+  const input = h("input", { type: "time", tabindex: -1, "aria-hidden": "true", value: state.serve_at ? toTime(state.serve_at * 1000) : "" });
+  input.addEventListener("change", () => act("serve", { at: input.value || null }));
+  const serve = h("button", { class: `serve-time${state.serve_at ? "" : " unset"}`, id: "serve-pick", onclick: () => { try { input.showPicker(); } catch { input.focus(); } } },
+    state.serve_at ? atClock(state.serve_at * 1000) : "Set a time", input);
+  const late = lateBy();
+  const verdict = !open.length ? "" : !state.serve_at ? `Ready ${atClock(readyAt())}` : late > LATE_AFTER ? `${hours(late)} late · ready ${atClock(readyAt())}` : "On time";
+  const key = ds.length > 1 && h("div", { class: `key${planDish ? " filtering" : ""}`, role: "group", "aria-label": "Show one dish" },
+    ds.map((d) => {
+      const mine = steps.filter((x) => x.dish === d), done = mine.filter((x) => x.status === "done").length;
+      return h("button", { "aria-pressed": String(planDish === d), title: d, style: `--dish: ${dishColor(d)}`, onclick: () => { planDish = planDish === d ? null : d; renderSheet(); } },
+        h("span", { class: "swatch" }), h("span", { class: "label" }, d), h("span", { class: "count" }, `${done}/${mine.length}`));
+    }));
+  const items = [
+    ...open.filter((x) => !planDish || x.dish === planDish).map((x) => ({ s: x, at: x.status === "in_progress" || x.start === 0 ? 0 : stateAt + x.start * 60000, end: stateAt + (x.end ?? 0) * 60000 })),
+    ...(planDish ? [] : (state.timers || []).filter((t) => t.kind === "reminder")).map((t) => ({ r: t, at: stateAt + t.seconds_left * 1000, end: stateAt + t.seconds_left * 1000 })),
+  ].sort((a, b) => a.at - b.at || a.end - b.end);
+  const rows = [];
+  const first = items[0];
+  if (first && first.at > 0) rows.push(h("li", { class: "item here" }, h("div", {},
+    h("span", { class: "at" }, h("span", { class: "now-at" }, "Now")), h("span", { class: "dot" }),
+    h("span", { class: "what" }, h("b", {}, "Nothing yet"), h("span", { "data-until": first.at, "data-in": "" }, `in ${hours((first.at - Date.now()) / 60000)}`)), h("span"))));
+  let lastAt = null, lastMeridiem = null, lastDish = null, busyUntil = Date.now();
+  for (const item of items) {
+    const start = item.at || Date.now();
+    if (!planDish && start - busyUntil >= FREE_GAP_MS) rows.push(h("li", { class: "gap" }, h("div", {}, h("span"), h("span"), h("span", {}, `${hours((start - busyUntil) / 60000)} free`))));
+    if (item.s?.hands_on) busyUntil = Math.max(busyUntil, item.end); else busyUntil = Math.max(busyUntil, start);
+    let at = "";
+    if (item.at === 0) at = lastAt === 0 ? "" : h("span", { class: "now-at" }, "Now");
+    else if (lastAt !== atClock(item.at)) {
+      const [time, meridiem] = atClock(item.at).split(" ");
+      at = [time, meridiem !== lastMeridiem && h("small", {}, meridiem)];
+      lastMeridiem = meridiem;
+    }
+    lastAt = item.at === 0 ? 0 : atClock(item.at);
+    rows.push(agendaRow(item, at, shown, item.s && item.s.dish !== lastDish));
+    if (item.s) lastDish = item.s.dish;
+  }
+  return [
+    h("section", {}, h("div", { class: "serve-row" }, h("label", { for: "serve-pick" }, "Eat at"), serve),
+      verdict && h("p", { class: `verdict${late > LATE_AFTER ? " behind" : ""}` }, verdict)),
+    key,
+    rows.length ? h("ol", { class: `agenda${planDish ? " filtered" : ""}` }, rows) : h("p", { class: "done-count" }, "All done."),
+  ];
+}
+function agendaRow({ s: st, r }, at, shown, newDish) {
+  if (r) return h("li", { class: "item reminder" }, h("div", {}, h("span", { class: "at" }, at), h("span", { class: "dot" }), h("span", { class: "what" }, h("b", {}, r.says), h("span", {}, "Reminder")), h("span")));
+  const going = st.status === "in_progress";
+  const kind = going && !st.hands_on ? "cooking" : going || st.start === 0 ? "now" : "later";
+  const length = !st.hands_on && st.minutes >= 30 ? `until ${atClock(stateAt + st.end * 60000)}` : hours(st.minutes);
+  return h("li", { class: ["item", kind].join(" "), style: `--dish: ${dishColor(st.dish)}` },
+    h("button", { onclick: () => { viewing = st.id; openSheet("nothing"); render(); } },
+      h("span", { class: "at" }, at), h("span", { class: "dot" }),
+      h("span", { class: "what" }, h("b", {}, st.title),
+        h("span", {}, cookName(st) && h("span", { class: "by" }, cookName(st)), [cookName(st) && "", length, !planDish && newDish && st.dish].filter((x) => x !== false && x != null).join(" · "))),
+      h("span", {}, kind === "cooking" && h("span", { class: "left", "data-until": stateAt + st.end * 60000, "data-clock": "" }, clock(st.end * 60)))));
+}
+
+// ---------- the HUD ----------
+const CUE = /^(if|when|once|until|the|it|it's|they|you'll|you should|this)\b/i;
+const MEASURE = /(\d+(?:[.,/]\d+)?(?:\s*(?:–|-|to)\s*\d+(?:[.,/]\d+)?)?\s*(?:°\s*[FC]?|degrees(?: [FC])?|minutes?|mins?|min|seconds?|hours?|inch(?:es)?|-inch|cm|mm|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|g|grams?|kg|lbs?|pounds?|ml|l)\b|\d+\s*°[CF]?)/g;
+function instructionLines(text) {
+  const sentences = text.trim().split(/(?<=[.!?])\s+(?=[A-Z])/);
+  return h("div", { class: "instruction" }, sentences.map((line) =>
+    h("p", { class: CUE.test(line) ? "cue" : false }, line.split(MEASURE).map((part, i) => (i % 2 ? h("b", {}, part) : part)))));
+}
+// What a step can be told: done if it's in your hands or cooking, started if it's due and cooks by itself, or started
+// early once nothing holds it up.
+function stepAction(st) {
+  const due = st.status === "pending" && st.start === 0;
+  if (st.status === "in_progress" || (due && st.hands_on)) return { label: "Done", status: "done", primary: true };
+  if (due) return { label: "Start", status: "started", primary: true };
+  if (st.status === "pending" && unblocked(st)) return { label: "Start now", status: "started", primary: false };
+  if (st.status === "done") return { label: "Undo", status: "not_started", primary: false };
+  return null;
+}
+function goButton(label, primary, onpress, cls = "") {
+  const b = h("button", { class: `${primary ? "go" : "ghost"} ${cls}`.trim() }, label, primary && h("kbd", {}, "↵"));
+  b.onclick = () => {
+    if (b.dataset.pressed) return;
+    b.dataset.pressed = "1";
+    b.classList.add("pressed");
+    onpress(b);
+  };
+  return b;
+}
+// Done: the button gives, the pan pops, a tock; then the step goes and the next comes in.
+function press(st, action, b) {
+  const obj = b.closest(".obj");
+  (action.status === "done" ? sound.done : action.status === "started" ? sound.start : sound.tap)();
+  if (action.status === "done") { b.firstChild.textContent = "✓"; }
+  worldPop(st.id);
+  setTimeout(() => {
+    obj?.classList.add("leave");
+    if (viewing === st.id && action.status !== "not_started") viewing = null;
+    act("step", { step_id: st.id, status: action.status });
+  }, reduced() ? 0 : 160);
+}
+let hudKeys = new Set();
+function objectiveEl(o, big) {
+  const fresh = !hudKeys.has(o.key);
+  const cls = ["obj", !big && "small", fresh && "enter", o.kind === "rang" && "alarm"].filter(Boolean).join(" ");
+  if (o.kind === "rang") {
+    const step = o.r.step_id && state.steps.find((x) => x.id === o.r.step_id);
+    const done = () => { rang.delete(o.label); if (o.r.step_id) act("step", { step_id: o.r.step_id, status: "done" }); sound.done(); render(); };
+    const more = () => { rang.delete(o.label); act("timer_again", { label: o.label, minutes: 1 }); sound.tap(); render(); };
+    return h("section", { class: cls, "data-key": o.key },
+      h("p", { class: "meta" }, h("span", {}, "Time"), step && h("span", { class: "dish", style: `--dish: ${dishColor(step.dish)}` }, step.dish)),
+      h("h1", {}, words(o.label)),
+      h("div", { class: "act" }, goButton("Done", true, done, "alarm"), goButton("+1 min", false, more)));
+  }
+  if (o.kind === "eat") {
+    return h("section", { class: cls, "data-key": o.key },
+      h("p", { class: "meta" }, h("span", {}, "Pass"), h("span", {}, atClock(state.finished_at * 1000))),
+      h("h1", {}, "Plates up."),
+      h("div", { class: "act" }, goButton("Done", true, () => { sound.done(); act("clear_finished"); })));
+  }
+  const st = o.s;
+  const action = stepAction(st);
+  const mine = state.steps.filter((x) => x.dish === st.dish);
+  const who = cookName(st);
+  const later = st.status === "pending" && st.start > 0;
+  const running = st.status === "in_progress" && !st.hands_on;
+  const meta = h("p", { class: "meta" },
+    o.anyone && state.cooks.length > 1 ? h("span", { class: "who c2" }, "Anyone") : who && h("span", { class: `who c${st.cook}` }, who),
+    h("span", { class: "dish", style: `--dish: ${dishColor(st.dish)}` }, st.dish),
+    h("span", {}, `${stepNumber(st)}/${mine.length}`),
+    !running && !later && h("span", {}, hours(st.minutes)));
+  const when = running ? h("p", { class: "when" }, h("span", { "data-until": stateAt + st.end * 60000, "data-clock": "" }, clock(st.end * 60)))
+    : later ? h("p", { class: "when" }, h("span", { "data-until": stateAt + st.start * 60000, "data-in": "" }, `in ${hours(st.start)}`))
+    : null;
+  const button = action && goButton(action.label, action.primary && big, (b) => press(st, action, b));
+  const uses = big && st.uses?.length > 0 && h("ul", { class: "uses" }, st.uses.map((name) => {
+    const i = (state.recipes[st.dish] || []).find((x) => x.name === name);
+    return h("li", { class: i && none(i.have) ? "out" : false }, i?.amount && h("span", { class: "amt" }, i.amount), name);
+  }));
+  const back = o.viewing && h("button", { class: "back", onclick: backToNow }, "← Now");
+  if (!big) {
+    return h("section", { class: cls, "data-key": o.key, "data-step": st.id },
+      h("div", { class: "row-small" }, h("div", {}, meta, h("h1", {}, st.title), when), button));
+  }
+  return h("section", { class: cls, "data-key": o.key, "data-step": st.id },
+    back, meta, h("h1", {}, st.title),
+    !sameWords(st.text, st.title) && instructionLines(st.text),
+    uses, when,
+    button && h("div", { class: "act" }, button));
+}
+// The next few things across every dish, with when: so a wait shows what it's for.
+function upNext(skip) {
+  const { open } = plan();
+  const next = open.filter((x) => !skip.has(x) && x.status === "pending" && x.start > 0).sort((a, b) => a.start - b.start).slice(0, 3);
+  if (!next.length) return null;
+  return h("ul", { class: "next" }, next.map((x) => h("li", {},
+    h("button", { onclick: () => { sound.tap(); viewing = x.id; render(); } },
+      h("small", { "data-until": stateAt + x.start * 60000, "data-in": "" }, `in ${hours(x.start)}`),
+      h("i", { style: `--dish: ${dishColor(x.dish)}` }),
+      h("span", {}, cookName(x) ? `${cookName(x)} · ${x.title}` : x.title)))));
+}
+function renderHud() {
+  const objs = objectives();
+  const hud = $("hud");
+  let kids;
+  if (!objs.length) {
+    const { steps } = plan();
+    kids = busyWith ? [h("p", { class: "hello working", "data-busy": "" }, busyText())]
+      : !steps.length ? [h("p", { class: "hello" }, hello())]
+      : [h("p", { class: "hello" }, "All cooking.")];
+  } else {
+    kids = objs.map((o, i) => objectiveEl(o, i === 0));
+    if (!viewing) kids.push(upNext(new Set(objs.map((o) => o.s).filter(Boolean))));
+  }
+  hudKeys = new Set(objs.map((o) => o.key));
+  hud.replaceChildren(...kids.filter(Boolean));
+}
+function backToNow() { sound.tap(); viewing = null; render(); }
+function look(delta) {
+  const { steps, current, shown } = plan();
+  if (!shown) return;
+  const i = steps.indexOf(shown) + delta;
+  if (i < 0 || i >= steps.length) return;
+  viewing = steps[i] === current ? null : steps[i].id;
+  sound.tap();
+  render();
+}
+
+// ---------- the world: the stove, drawn from the kitchen's setup ----------
+const CELL = 230, PAN_R = 78, FLAME_R = 92, TIPS = 30;
+const GAP = 28, OVEN_W = 270, COUNTER_H = 120;
+let geometry = null; // {key, burners: [{x, y}], ovens: [{x, y, w, h}], counter: {x, y, w, h}, W, H}
+const burnerOf = new Map(); // step id -> burner index, so a pan stays where it was put
+let svgRoot = null, layers = null;
+const pans = new Map(); // key -> <g>
+
+function layout() {
+  const p = state?.kitchen?.profile || {};
+  const B = Math.min(p.burners ?? 4, 8), O = Math.min(p.ovens ?? 1, 2);
+  const key = `${B}:${O}`;
+  if (geometry?.key === key) return geometry;
+  const cols = B <= 3 ? Math.max(B, 1) : B === 4 ? 2 : B <= 6 ? 3 : 4;
+  const rows = B ? Math.ceil(B / cols) : 0;
+  const pad = 34;
+  const topW = B ? cols * CELL + pad * 2 : 0, topH = B ? rows * CELL + pad * 2 : 0;
+  const burners = [];
+  for (let i = 0; i < B; i++) {
+    const r = Math.floor(i / cols), inRow = Math.min(cols, B - r * cols), c = i % cols;
+    const offset = ((cols - inRow) * CELL) / 2;
+    burners.push({ x: pad + offset + c * CELL + CELL / 2, y: pad + r * CELL + CELL / 2 });
+  }
+  const bodyH = Math.max(topH, O ? 470 : 0);
+  const ovenX = topW ? topW + GAP : 0;
+  const ovens = [];
+  for (let i = 0; i < O; i++) ovens.push({ x: ovenX, y: (i * bodyH) / O + (i ? GAP / 2 : 0), w: OVEN_W, h: bodyH / O - (O > 1 ? GAP / 2 : 0) });
+  const W = Math.max(topW + (O ? (topW ? GAP : 0) + OVEN_W : 0), 600);
+  const counter = { x: 0, y: bodyH + GAP, w: W, h: COUNTER_H };
+  geometry = { key, B, O, burners, ovens, topW, topH, counter, W, H: bodyH + GAP + COUNTER_H };
+  svgRoot = null; // a different kitchen: draw it fresh
+  return geometry;
+}
+
+function drawStove() {
+  const g = geometry;
+  pans.clear();
+  const defs = s("defs", {},
+    s("radialGradient", { id: "halo" }, s("stop", { offset: "55%", "stop-color": "var(--flame)", "stop-opacity": 0 }), s("stop", { offset: "72%", "stop-color": "var(--flame)", "stop-opacity": 0.22 }), s("stop", { offset: "100%", "stop-color": "var(--flame)", "stop-opacity": 0 })),
+    s("radialGradient", { id: "halo-hot" }, s("stop", { offset: "55%", "stop-color": "var(--alarm)", "stop-opacity": 0 }), s("stop", { offset: "72%", "stop-color": "var(--alarm)", "stop-opacity": 0.3 }), s("stop", { offset: "100%", "stop-color": "var(--alarm)", "stop-opacity": 0 })),
+    s("radialGradient", { id: "oven-glow", cx: "50%", cy: "15%", r: "90%" }, s("stop", { offset: "0%", "stop-color": "var(--glow)", "stop-opacity": 0.85 }), s("stop", { offset: "100%", "stop-color": "var(--glow)", "stop-opacity": 0.05 })),
+    s("radialGradient", { id: "shade" }, s("stop", { offset: "40%", "stop-color": "#000", "stop-opacity": 0.15 }), s("stop", { offset: "100%", "stop-color": "#000", "stop-opacity": 0.65 })),
+    s("clipPath", { id: "well-clip" }, s("circle", { r: PAN_R - 9 })));
+  const root = s("svg", { class: "stove", viewBox: `-30 -40 ${g.W + 60} ${g.H + 70}`, preserveAspectRatio: "xMidYMid meet" }, defs);
+  const len = (n) => `--len: ${Math.ceil(n)}`;
+  // The cooktop
+  if (g.B) {
+    root.append(s("rect", { class: "surface draw", x: 0, y: 0, width: g.topW, height: g.topH, rx: 26, style: `${len(2 * (g.topW + g.topH))}` }));
+  }
+  const burnerLayer = s("g"), panLayer = s("g"), markLayer = s("g");
+  g.burners.forEach((b, i) => {
+    const d = `--d: ${0.08 * i}s`;
+    const grate = s("g", { class: "fade-in", style: d },
+      ...[45, 135, 225, 315].map((a) => {
+        const r = (a * Math.PI) / 180, c = Math.cos(r), sn = Math.sin(r);
+        return s("line", { class: "grate", x1: 40 * c, y1: 40 * sn, x2: (CELL / 2 - 14) * c, y2: (CELL / 2 - 14) * sn });
+      }),
+      s("circle", { class: "ring-port", r: FLAME_R - 4 }),
+      s("circle", { class: "cap", r: 30 }));
+    const flames = s("g", { class: "flames" }, s("circle", { class: "halo", r: FLAME_R + 40 }));
+    for (let t = 0; t < TIPS; t++) {
+      const a = (t / TIPS) * 360;
+      const dur = (0.35 + Math.random() * 0.3).toFixed(2), dl = (-Math.random()).toFixed(2);
+      flames.append(s("g", { transform: `rotate(${a}) translate(0 ${-FLAME_R + 2})` },
+        s("path", { class: "flame", d: "M-5 0 C-5 -7 -2 -12 0 -20 C2 -12 5 -7 5 0 Z", style: `--t: ${dur}s; --dl: ${dl}s` }),
+        s("path", { class: "flame core", d: "M-2.4 0 C-2.4 -4 -1 -6 0 -10 C1 -6 2.4 -4 2.4 0 Z", style: `--t: ${dur}s; --dl: ${dl}s` })));
+    }
+    const ghost = s("g", { class: "ghost-slot" });
+    burnerLayer.append(s("g", { transform: `translate(${b.x} ${b.y})`, "data-burner": i }, grate, flames, ghost));
+  });
+  // Ovens
+  const ovenLayer = s("g");
+  g.ovens.forEach((o, i) => {
+    const win = { x: 22, y: 64, w: o.w - 44, h: o.h - 64 - 56 };
+    const zig = Array.from({ length: 9 }, (_, k) => `${win.x + 16 + (k * (win.w - 32)) / 8} ${win.y + 16 + (k % 2) * 10}`).join(" L");
+    const racks = [0.48, 0.8].map((f) => win.y + win.h * f);
+    ovenLayer.append(s("g", { class: "oven", transform: `translate(${o.x} ${o.y})`, "data-oven": i },
+      s("rect", { class: "oven-body draw", width: o.w, height: o.h, rx: 22, style: len(2 * (o.w + o.h)) }),
+      s("text", { class: "oven-label", x: 22, y: 38 }, g.O > 1 ? `Oven ${i + 1}` : "Oven"),
+      s("text", { class: "oven-read", x: o.w - 22, y: 42 }),
+      s("rect", { class: "oven-window", x: win.x, y: win.y, width: win.w, height: win.h, rx: 12 }),
+      s("rect", { class: "oven-glow", x: win.x, y: win.y, width: win.w, height: win.h, rx: 12 }),
+      s("path", { class: "oven-element", d: `M${zig}` }),
+      ...racks.map((y) => s("line", { class: "oven-rack", x1: win.x + 10, x2: win.x + win.w - 10, y1: y, y2: y })),
+      s("g", { class: "trays", "data-win": JSON.stringify({ ...win, racks }) }),
+      s("rect", { class: "oven-handle", x: o.w * 0.2, y: o.h - 32, width: o.w * 0.6, height: 8, rx: 4 })));
+  });
+  // Counter
+  const c = g.counter;
+  const counterLayer = s("g", { transform: `translate(${c.x} ${c.y})` },
+    s("line", { class: "counter-line draw", x1: 0, x2: c.w, y1: 0, y2: 0, style: len(c.w) }),
+    s("g", { class: "boards" }));
+  root.append(burnerLayer, ovenLayer, counterLayer, panLayer, markLayer);
+  layers = { burnerLayer, ovenLayer, counterLayer, panLayer, markLayer };
+  $("world").replaceChildren(root);
+  svgRoot = root;
+}
+
+// Which burner each burner step is on. A dish keeps its pan where it was (sear, deglaze, braise in one pan), steps
+// already going keep their burner, and upcoming steps take the burner that frees up first.
+function assignBurners(steps) {
+  const B = geometry.B;
+  const taken = new Array(B).fill(null); // what's on each burner now
+  const freeAt = new Array(B).fill(0); // when each burner frees up (minutes from now)
+  const active = (x) => x.status === "in_progress" || (x.status === "pending" && x.start === 0);
+  const burnerSteps = steps.filter((x) => x.equipment === "burner");
+  const lastFor = (dish) => { // the burner this dish's latest burner step was on
+    for (const x of [...burnerSteps].reverse()) if (x.dish === dish && x.status === "done" && burnerOf.has(x.id)) return burnerOf.get(x.id);
+    return null;
+  };
+  const place = (x, from) => {
+    const want = [burnerOf.get(x.id), lastFor(x.dish)].filter((b) => b != null && b < B);
+    for (const b of want) if (from(b)) return b;
+    for (let b = 0; b < B; b++) if (from(b)) return b;
+    return null;
+  };
+  const now = burnerSteps.filter(active).sort((a, b) => (a.status === "in_progress" ? 0 : 1) - (b.status === "in_progress" ? 0 : 1));
+  // A step that follows straight on from one still in a pan (finish the sauce after the braise) is that pan's next
+  // step, not a second pan.
+  const inPan = (x) => taken.some((t) => t && t.dish === x.dish && x.after.includes(t.id));
+  for (const x of now) {
+    if (inPan(x)) continue;
+    const b = place(x, (b) => !taken[b]);
+    if (b == null) continue;
+    taken[b] = x; freeAt[b] = x.end ?? 0; burnerOf.set(x.id, b);
+  }
+  // The next step for each empty burner, shown as a ghost
+  const ghosts = new Array(B).fill(null);
+  const later = burnerSteps.filter((x) => x.status === "pending" && x.start > 0).sort((a, b) => a.start - b.start);
+  for (const x of later) {
+    const b = place(x, (b) => freeAt[b] <= x.start + 0.01);
+    if (b == null) continue;
+    if (!taken[b] && !ghosts[b]) ghosts[b] = x;
+    freeAt[b] = x.end ?? x.start + x.minutes; burnerOf.set(x.id, b);
+  }
+  return { taken, ghosts };
+}
+
+const POT_WORDS = /\b(boil|blanch|simmer|braise|stock|pasta|poach|pot|soup|potatoes|water|beans)\b/i;
+function timerFor(st) { return (state.timers || []).find((t) => t.step_id === st.id && t.kind !== "reminder"); }
+// A step's time on the stove: until (ms) and total (s), from its timer when it has one.
+function timing(st) {
+  const t = timerFor(st);
+  if (t) return { until: stateAt + t.seconds_left * 1000, total: t.seconds, paused: t.paused, left: t.seconds_left };
+  if (st.status === "in_progress" && !st.hands_on && st.end != null) return { until: stateAt + st.end * 60000, total: st.minutes * 60 };
+  return null;
+}
+
+const pictures = new Map();
+function picture(st) {
+  const key = `/steppic?${new URLSearchParams({ dish: st.dish, title: st.title, text: st.text })}`;
+  if (!pictures.has(key)) pictures.set(key, fetch(key).then((r) => r.json()).catch(() => ({ url: null })));
+  return pictures.get(key);
+}
+
+function panEl(st, kind) {
+  const g = s("g", { class: "pan", style: `--dish: ${dishColor(st.dish)}`, onclick: () => { sound.tap(); viewing = viewing === st.id ? null : st.id; render(); } });
+  const body = s("g", {});
+  if (kind === "pot") {
+    body.append(s("rect", { class: "handle", x: -PAN_R - 18, y: -11, width: 36, height: 22, rx: 8 }), s("rect", { class: "handle", x: PAN_R - 18, y: -11, width: 36, height: 22, rx: 8 }));
+  } else {
+    body.append(s("rect", { class: "handle", x: PAN_R - 10, y: -10, width: 92, height: 20, rx: 10, transform: "rotate(35)" }));
+  }
+  body.append(s("circle", { class: "body", r: PAN_R }), s("circle", { class: "well", r: PAN_R - 9 }));
+  const pic = s("g", { "clip-path": "url(#well-clip)" });
+  body.append(pic, s("circle", { class: "rim", r: PAN_R - 9 }));
+  // What's in the pan, when there's a picture of it.
+  picture(st).then(({ url }) => {
+    if (!url) return;
+    const img = s("image", { href: url, x: -PAN_R, y: -PAN_R, width: PAN_R * 2, height: PAN_R * 2, preserveAspectRatio: "xMidYMid slice", class: "pic" });
+    pic.append(img, s("circle", { class: "shade", r: PAN_R }));
+  });
+  const label = s("text", { class: "label", y: -20 }, abbreviate(st.dish, 14));
+  const big = s("text", { class: "big", y: 22 });
+  body.append(label, big);
+  g.append(body);
+  g._big = big; g._body = body;
+  return g;
+}
+const abbreviate = (text, n) => (text.length > n ? `${text.slice(0, n - 1).trim()}…` : text);
+
+// Put each thing where it is: pans on burners, trays in the oven, boards on the counter. Keyed, so what stays stays
+// put and what's new arrives with a little drop.
+function renderWorld() {
+  if (!state) return;
+  layout();
+  if (!svgRoot) drawStove();
+  const { steps, open } = plan();
+  const objs = objectives();
+  const focus = new Map(objs.filter((o) => o.s).map((o, i) => [o.s.id, { o, i }]));
+  const rungSteps = new Set([...rang.values()].map((r) => r.step_id).filter(Boolean));
+  const seen = new Set();
+  const { taken, ghosts } = geometry.B ? assignBurners(steps) : { taken: [], ghosts: [] };
+  layers.markLayer.replaceChildren();
+
+  // Burners
+  geometry.burners.forEach((b, i) => {
+    const node = layers.burnerLayer.children[i];
+    const flames = node.querySelector(".flames");
+    const st = taken[i];
+    const tm = st && timing(st);
+    flames.classList.toggle("on", !!st);
+    flames.classList.toggle("alarm", !!st && rungSteps.has(st.id));
+    flames.classList.toggle("paused", !!tm?.paused);
+    if (tm && !tm.paused) { flames.dataset.until = tm.until; flames.dataset.total = tm.total; } else { delete flames.dataset.until; delete flames.dataset.total; flames.querySelectorAll(".out").forEach((f) => f.classList.remove("out")); flames.classList.remove("low"); }
+    // A ghost: the next pan this burner gets, and when.
+    const ghost = node.querySelector(".ghost-slot");
+    const gs = ghosts[i];
+    ghost.replaceChildren(...(gs && !st ? [
+      s("circle", { class: "ghost-pan", r: PAN_R }),
+      s("text", { class: "ghost-text", y: -14 }, abbreviate(gs.dish, 14)),
+      s("text", { class: "ghost-when", y: 22, "data-until": stateAt + gs.start * 60000, "data-short": "" }, short(gs.start)),
+    ] : []));
+    ghost.onclick = gs ? () => { sound.tap(); viewing = gs.id; render(); } : null;
+    ghost.style.cursor = gs ? "pointer" : "";
+    if (st) {
+      const key = `pan:${st.dish}:${i}`;
+      seen.add(key);
+      let pan = pans.get(key);
+      if (!pan) {
+        pan = panEl(st, POT_WORDS.test(`${st.title} ${st.text}`) ? "pot" : "skillet");
+        pan.setAttribute("transform", `translate(${b.x} ${b.y})`);
+        pan._body.classList.add("pan-in");
+        layers.panLayer.append(pan);
+        pans.set(key, pan);
+      }
+      pan.dataset.step = st.id;
+      pan.onclick = () => { sound.tap(); viewing = viewing === st.id ? null : st.id; render(); };
+      pan._body.classList.toggle("rattle", rungSteps.has(st.id));
+      const big = pan._big;
+      if (tm) { big.setAttribute("class", "big"); big.dataset.until = tm.until; big.dataset.clock = ""; big.textContent = clock((tm.until - Date.now()) / 1000); if (tm.paused) { delete big.dataset.until; big.textContent = clock(tm.left); } }
+      else { delete big.dataset.until; big.setAttribute("class", "big word"); big.textContent = abbreviate(st.title.split(" ")[0], 10); }
+      mark(st, b.x, b.y, PAN_R, focus, rungSteps);
+    }
+  });
+
+  // Ovens: preheating warms the window; dishes sit on the racks.
+  const ovenSteps = open.filter((x) => x.equipment === "oven" && (x.status === "in_progress" || (x.status === "pending" && x.start === 0)));
+  const PREHEAT = /\b(heat|preheat)\b/i;
+  geometry.ovens.forEach((o, i) => {
+    const node = layers.ovenLayer.children[i];
+    const mine = ovenSteps.filter((_, k) => Math.floor(k / 2) % geometry.O === i || geometry.O === 1);
+    const heating = mine.find((x) => PREHEAT.test(x.title));
+    const dishesIn = mine.filter((x) => x !== heating).slice(0, 2);
+    const on = mine.some((x) => x.status === "in_progress") || dishesIn.length > 0;
+    node.classList.toggle("hot", on);
+    const glow = node.querySelector(".oven-glow");
+    const read = node.querySelector(".oven-read");
+    const ht = heating && timing(heating);
+    // The window warms as the oven heats; once it's hot, it stays lit.
+    if (ht) { glow.dataset.until = ht.until; glow.dataset.total = ht.total; read.dataset.until = ht.until; read.dataset.clock = ""; }
+    else { delete glow.dataset.until; delete read.dataset.until; glow.style.opacity = on ? 0.9 : 0; read.textContent = on ? "Hot" : ""; }
+    const traysG = node.querySelector(".trays");
+    const win = JSON.parse(traysG.dataset.win);
+    const keys = new Set();
+    dishesIn.forEach((x, k) => {
+      const key = `tray:${x.id}`;
+      keys.add(key);
+      let tray = traysG.querySelector(`[data-key="${CSS.escape(key)}"]`);
+      const tw = win.w - 40, th = 46, ty = win.racks[k] - th - 3;
+      if (!tray) {
+        tray = s("g", { class: "tray pan", "data-key": key, style: `--dish: ${dishColor(x.dish)}`, transform: `translate(${win.x + 20} ${ty})` },
+          s("g", { class: "pan-in" },
+            s("rect", { class: "body", width: tw, height: th, rx: 8 }),
+            s("text", { class: "label", x: 14, y: 28, "text-anchor": "start", style: "text-anchor: start" }, abbreviate(x.dish, 14)),
+            s("text", { class: "big", x: tw - 14, y: 32, style: "font-size: 22px; text-anchor: end" })));
+        traysG.append(tray);
+      }
+      tray.onclick = () => { sound.tap(); viewing = viewing === x.id ? null : x.id; render(); };
+      tray.dataset.step = x.id;
+      const big = tray.querySelector(".big");
+      const tm = timing(x);
+      if (tm) { big.dataset.until = tm.until; big.dataset.clock = ""; } else { delete big.dataset.until; big.textContent = "Now"; }
+      tray.firstChild.classList.toggle("rattle", rungSteps.has(x.id));
+      mark(x, o.x + win.x + 20 + tw / 2, o.y + ty + th / 2, 0, focus, rungSteps, { w: tw, h: th });
+    });
+    for (const t of [...traysG.children]) if (!keys.has(t.dataset.key)) leave(t);
+    if (heating) mark(heating, o.x + o.w / 2, o.y + 30, 0, focus, rungSteps, { w: o.w - 30, h: 44 });
+  });
+
+  // The counter: prep in hand, things resting or chilling, and timers that aren't for any one step.
+  const boardsG = layers.counterLayer.querySelector(".boards");
+  const counterSteps = open.filter((x) => x.equipment === "none" && (x.status === "in_progress" || (x.status === "pending" && x.start === 0)));
+  const loose = (state.timers || []).filter((t) => t.kind !== "reminder" && !t.follows && (!t.step_id || !steps.some((x) => x.id === t.step_id && x.equipment !== "none")));
+  const items = [
+    ...counterSteps.map((x) => ({ key: `board:${x.id}`, st: x })),
+    ...loose.filter((t) => !counterSteps.some((x) => x.id === t.step_id)).map((t) => ({ key: `timer:${t.label}`, t })),
+  ];
+  const BW = 236, BH = 84, BG = 36, per = Math.max(1, Math.floor((geometry.counter.w + BG) / (BW + BG)));
+  const keys = new Set();
+  items.slice(0, per).forEach((it, k) => {
+    keys.add(it.key);
+    let el = boardsG.querySelector(`[data-key="${CSS.escape(it.key)}"]`);
+    const x = 12 + k * (BW + BG), y = 24;
+    if (!el) {
+      el = s("g", { class: "board", "data-key": it.key }, s("g", { class: "pan-in" },
+        s("rect", { class: "body", width: BW, height: BH, rx: 14 }),
+        s("circle", { class: "tick-ring", cx: 42, cy: BH / 2, r: 24 }),
+        s("circle", { class: "tick-arc", cx: 42, cy: BH / 2, r: 24, transform: `rotate(-90 42 ${BH / 2})`, "stroke-dasharray": 2 * Math.PI * 24, "stroke-dashoffset": 0 }),
+        s("circle", { class: "dot", cx: 42, cy: BH / 2, r: 6 }),
+        s("text", { class: "label", x: 80, y: 32 }),
+        s("text", { class: "title", x: 80, y: 58 })));
+      boardsG.append(el);
+    }
+    el.setAttribute("transform", `translate(${x} ${y})`);
+    const [label, title] = [el.querySelector(".label"), el.querySelector(".title")];
+    const arc = el.querySelector(".tick-arc"), ring = el.querySelector(".tick-ring");
+    if (it.st) {
+      const st = it.st, tm = timing(st);
+      el.style.setProperty("--dish", dishColor(st.dish));
+      el.dataset.step = st.id;
+      el.onclick = () => { sound.tap(); viewing = viewing === st.id ? null : st.id; render(); };
+      label.textContent = abbreviate(st.dish, 18);
+      if (tm) { title.setAttribute("class", "big"); title.dataset.until = tm.until; title.dataset.clock = ""; arc.dataset.until = tm.until; arc.dataset.total = tm.total; arc.style.display = ring.style.display = ""; }
+      else { title.setAttribute("class", "title"); delete title.dataset.until; title.textContent = abbreviate(st.title, 20); arc.style.display = ring.style.display = "none"; }
+      el.classList.toggle("alarm", rungSteps.has(st.id));
+      mark(st, geometry.counter.x + x + BW / 2, geometry.counter.y + y + BH / 2, 0, focus, rungSteps, { w: BW, h: BH });
+    } else {
+      const t = it.t;
+      el.style.setProperty("--dish", "var(--hot)");
+      label.textContent = abbreviate(words(t.label), 18);
+      title.setAttribute("class", "big");
+      el.classList.toggle("paused", t.paused);
+      el.classList.toggle("alarm", rang.has(t.label));
+      arc.style.display = ring.style.display = "";
+      if (!t.paused) { title.dataset.until = stateAt + t.seconds_left * 1000; title.dataset.clock = ""; arc.dataset.until = title.dataset.until; arc.dataset.total = t.seconds; }
+      else { delete title.dataset.until; delete arc.dataset.until; title.textContent = clock(t.seconds_left); }
+      el.onclick = () => { sound.tap(); act("timer", { label: t.label, change: t.paused ? "resume" : "pause" }); };
+      el.style.cursor = "pointer";
+    }
+  });
+  for (const el of [...boardsG.children]) if (!keys.has(el.dataset.key)) leave(el);
+
+  // Pans that came off
+  for (const [key, pan] of pans) if (!seen.has(key)) { pans.delete(key); leave(pan, pan._body); }
+  tick();
+}
+function leave(el, inner = el.firstChild) {
+  if (el.dataset.leaving) return;
+  el.dataset.leaving = "1";
+  inner?.classList?.remove("pan-in");
+  inner?.classList?.add("pan-out");
+  setTimeout(() => el.remove(), reduced() ? 0 : 340);
+}
+// The marker on whatever the cook's hands should be on: a turning ring, with their name when there's more than one.
+function mark(st, x, y, r, focus, rungSteps, box) {
+  const f = focus.get(st.id);
+  if (!f && viewing !== st.id) return;
+  const g = s("g", { transform: `translate(${x} ${y})` });
+  if (box) g.append(s("rect", { class: "reticle", x: -box.w / 2 - 10, y: -box.h / 2 - 10, width: box.w + 20, height: box.h + 20, rx: 18 }));
+  else g.append(s("circle", { class: "reticle", r: r + 46 }));
+  const name = f?.o?.anyone ? "Anyone" : cookName(st);
+  if (name && state.cooks.length > 1) {
+    const w = name.length * 9 + 24, top = box ? -box.h / 2 - 10 : -r - 46;
+    g.append(s("g", { class: `badge ${f?.o?.anyone ? "c2" : `c${st.cook}`}`, transform: `translate(0 ${top})` },
+      s("rect", { x: -w / 2, y: -13, width: w, height: 26, rx: 13 }), s("text", { y: 4.5 }, name)));
+  }
+  layers.markLayer.append(g);
+}
+function worldPop(stepId) {
+  const el = svgRoot?.querySelector(`[data-step="${CSS.escape(stepId)}"]`);
+  const target = el?._body || el?.firstChild;
+  if (!target) return;
+  target.classList.remove("pop"); void target.getBBox(); target.classList.add("pop");
+}
+
+// ---------- how-to ----------
+function renderHowTo() {
+  const how = state?.how_to;
+  const box = $("howto");
+  box.hidden = !how;
+  if (!how) { box.replaceChildren(); box.dataset.topic = ""; return; }
+  if (box.dataset.topic === how.topic) return;
+  box.dataset.topic = how.topic;
+  const fig = (st) => {
+    const f = h("figure", { class: "loading" });
+    picture(st).then(({ url }) => { if (!url) return f.remove(); const img = h("img", { src: url, alt: "" }); img.onload = () => { f.classList.remove("loading"); f.replaceChildren(img); }; });
+    return f;
+  };
+  box.replaceChildren(h("section", { class: "howto" },
+    h("div", { class: "howto-head" },
+      h("div", {}, h("h1", {}, how.topic), how.watch_out && h("p", { class: "watch" }, h("b", {}, "Watch out"), how.watch_out)),
+      goButton("Done", true, () => { sound.done(); act("close_how"); })),
+    h("ol", { class: "howto-steps", style: `--cols: ${how.steps.length === 4 ? 4 : Math.min(how.steps.length, 3)}` }, how.steps.map((st, i) => h("li", {},
+      fig({ dish: how.topic, title: st.title, text: st.text }),
+      h("h3", {}, h("span", { class: "n" }, String(i + 1).padStart(2, "0")), st.title),
+      h("p", {}, st.text))))));
+}
+
+// ---------- timers ----------
+function ring(label) {
+  const step_id = (state?.timers || []).find((t) => t.label === label)?.step_id || null;
+  rang.set(label, { at: Date.now(), step_id });
+  sound.ring();
+  render();
+}
+
+// Without Basil, the server keeps time but rings nothing: a timer that runs out on screen rings here.
+const rungHere = new Set();
+function ringDueTimers(now) {
+  for (const t of state?.timers || []) {
+    if (t.kind === "reminder" || t.paused || t.follows) continue;
+    const due = stateAt + t.seconds_left * 1000 <= now;
+    if (!due) { rungHere.delete(t.label); continue; }
+    if (!ws && !rungHere.has(t.label) && !rang.has(t.label)) { rungHere.add(t.label); ring(t.label); }
+  }
+}
+
+// ---------- render & tick ----------
+function render() {
+  if (!state) return;
+  renderNotice();
+  renderNav();
+  renderHud();
+  renderWorld();
+  renderHowTo();
+  if (sheetView) renderSheet();
+  $("status").hidden = !busyWith || !plan().steps.length;
+  $("status").textContent = busyText();
+  $("status").toggleAttribute("data-busy", !!busyWith);
+}
+
+// Countdowns tick in place, so nothing is rebuilt under a finger; flames go out one by one as time runs down.
+function tick() {
+  const now = Date.now();
+  ringDueTimers(now);
+  for (const el of document.querySelectorAll(".flames[data-until]")) {
+    const left = (el.dataset.until - now) / 1000, frac = Math.max(0, Math.min(1, left / (Number(el.dataset.total) || 1)));
+    const lit = Math.ceil(frac * TIPS);
+    const tips = el.querySelectorAll("g");
+    tips.forEach((g, i) => g.querySelectorAll(".flame").forEach((f) => f.classList.toggle("out", i >= lit && left > 0)));
+    el.classList.toggle("low", left < 30);
+  }
+  for (const el of document.querySelectorAll(".oven-glow[data-until]")) {
+    const left = (el.dataset.until - now) / 1000, frac = 1 - Math.max(0, Math.min(1, left / (Number(el.dataset.total) || 1)));
+    el.style.opacity = 0.15 + 0.75 * frac;
+  }
+  for (const el of document.querySelectorAll(".tick-arc[data-until]")) {
+    const left = (el.dataset.until - now) / 1000, frac = Math.max(0, Math.min(1, left / (Number(el.dataset.total) || 1)));
+    el.setAttribute("stroke-dashoffset", 2 * Math.PI * 24 * (1 - frac));
+  }
+  if (now % 2000 < 1000) for (const el of document.querySelectorAll("img[data-live]")) el.src = `/shopper-frame?${now}`;
+  for (const el of document.querySelectorAll("[data-until]:not(.flames):not(.oven-glow):not(.tick-arc)")) {
+    const sec = (el.dataset.until - now) / 1000;
+    el.textContent = "in" in el.dataset ? `in ${hours(sec / 60)}` : "short" in el.dataset ? short(sec / 60) : clock(sec);
+  }
+}
+setInterval(tick, 1000);
+pilot("asleep");
+if (stayConnected()) wake(true);
+</script>
+</body>
+</html>
