@@ -7,994 +7,472 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 15C3 13 2 7 4 3c3 0 9 2 9 7 0 3-2 5-5 5z' fill='%232f8f5b'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;700;800&display=swap">
 <style>
-  /* The stove, as a toy: the cook's own range seen from the front and a little above, with pots in each dish's
-     colour on the burners it's using, the oven's window lit when something's in it, and the counter beside it. The
-     card on the left is the one thing to do now; the marker over the stove shows where. Basil is the leaf. */
+  /* The stove: the cook's range, seen from the front and a little above. Each dish is a pot in its own colour on the
+     burner it's using; the card beside it is the one thing to do now. Basil is the leaf. */
   :root {
-    --bg: #efe5d3; --wall: #f3ebdd; --tile: #e7dcc8; --floor: #dccdb3;
-    --top: #fffaf2; --ink: #211b14; --muted: #8b7f6d; --line: #eadfcd; --line-2: #d3c4ab;
-    --enamel: #2f8f5b; --enamel-hi: #48ad74; --enamel-lo: #1f6a42; --steel: #22251f; --steel-2: #30342d; --grate: #45493f;
-    --chrome: #e4e6e1; --chrome-lo: #a9ada5; --wood: #dfae72; --wood-lo: #b9834a; --cab: #f6efe2; --cab-lo: #dccfb8;
-    --flame: #3f7bff; --flame-2: #a9c4ff; --hot: #ff8a2a; --alarm: #ee3d2c; --gold: #ffc23a;
-    --go: #2f8f5b; --go-lo: #1d6a40;
-    --d0: #f0692c; --d1: #2f6fd6; --d2: #f3b928; --d3: #d63a63; --d4: #8a5cdc; --d5: #17a2a0; --d6: #ef8fb2; --d7: #a06c42;
-    --c0: #ff5a4e; --c1: #3d8bff; --c2: #ffb81f; --c3: #a96bff;
-    --display: "Rubik", ui-rounded, "Avenir Next", system-ui, sans-serif;
-    --mono: "Rubik", ui-rounded, system-ui, sans-serif;
+    --bg: #f1ebe1; --top: #fffbf5; --ink: #211b14; --muted: #8b8070; --line: #e6dccc; --line-2: #d4c7b3;
+    --enamel: #2f8f5b; --enamel-lo: #23714a; --steel: #24272a; --bowl: #1a1c1e;
+    --flame: #3f7bff; --flame-2: #a9c4ff; --hot: #ff8a2a; --alarm: #ee3d2c;
+    --go: #2f8f5b; --go-lo: #1f6a42;
+    --d0: #f0692c; --d1: #2f6fd6; --d2: #e9ad1c; --d3: #d63a63; --d4: #8a5cdc; --d5: #17a2a0; --d6: #ef8fb2; --d7: #a06c42;
+    --c0: #ff5a4e; --c1: #3d8bff; --c2: #f0a81a; --c3: #a96bff;
+    --display: "Rubik", ui-rounded, system-ui, sans-serif; --mono: var(--display);
     --ease: cubic-bezier(.2, .9, .25, 1); --spring: cubic-bezier(.34, 1.56, .5, 1);
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #11141c; --wall: #151924; --tile: #1b2030; --floor: #0b0d13;
-      --top: #1d2230; --ink: #f4efe6; --muted: #8f97aa; --line: #2a3043; --line-2: #3b4360;
-      --cab: #262c3c; --cab-lo: #1b2030; --chrome: #c9ccd3; --chrome-lo: #7f8492;
-      color-scheme: dark;
-    }
+    :root:not([data-theme="light"]) { --bg: #121419; --top: #1d2027; --ink: #f2eee6; --muted: #8d939f; --line: #2a2e37; --line-2: #3a404c; color-scheme: dark; }
   }
-  :root[data-theme="dark"] {
-    --bg: #11141c; --wall: #151924; --tile: #1b2030; --floor: #0b0d13;
-    --top: #1d2230; --ink: #f4efe6; --muted: #8f97aa; --line: #2a3043; --line-2: #3b4360;
-    --cab: #262c3c; --cab-lo: #1b2030; --chrome: #c9ccd3; --chrome-lo: #7f8492;
-    color-scheme: dark;
-  }
+  :root[data-theme="dark"] { --bg: #121419; --top: #1d2027; --ink: #f2eee6; --muted: #8d939f; --line: #2a2e37; --line-2: #3a404c; color-scheme: dark; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
   body {
     background: var(--bg); color: var(--ink); font-family: var(--display); overflow: hidden;
-    display: grid; grid-template-columns: minmax(340px, 4fr) minmax(0, 7fr); grid-template-rows: auto minmax(0, 1fr) auto;
-    column-gap: clamp(16px, 3vw, 48px);
-    padding-block: max(16px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-bottom));
-    padding-inline: clamp(16px, 3vw, 44px); user-select: none; -webkit-tap-highlight-color: transparent;
+    display: grid; grid-template-columns: minmax(320px, 2fr) minmax(0, 3fr); grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: clamp(24px, 4vw, 72px);
+    padding-block: max(18px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-bottom));
+    padding-inline: clamp(16px, 4vw, 64px); user-select: none; -webkit-tap-highlight-color: transparent;
   }
   button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
-  button:focus-visible, a:focus-visible { outline: 3px solid var(--flame); outline-offset: 4px; border-radius: 14px; }
+  button:focus-visible { outline: 3px solid var(--flame); outline-offset: 4px; border-radius: 12px; }
   [hidden] { display: none !important; }
 
-  /* ---------- top: the wordmark and the ways into everything else ---------- */
-  header { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-height: 48px; position: relative; z-index: 2; }
-  .wordmark { display: flex; align-items: center; gap: 8px; font-size: 26px; font-weight: 900; letter-spacing: -.04em; }
-  .wordmark svg { width: 26px; height: 26px; }
-  nav { margin-left: auto; display: flex; gap: 8px; }
-  /* How far through dinner: one segment per step, filling in each dish's colour, like a level's progress bar. */
-  #track { margin: 0 auto; display: flex; align-items: center; gap: 14px; height: 40px; padding: 0 16px; border-radius: 999px; background: var(--top);
-    box-shadow: 0 3px 0 var(--line-2); width: min(560px, 46vw); }
-  #track:hover { transform: translateY(-1px); }
-  #track .segs { flex: 1; display: flex; gap: 4px; height: 14px; }
-  #track .seg { flex: 1; border-radius: 5px; background: color-mix(in srgb, var(--ink) 10%, transparent); position: relative; overflow: hidden; }
-  #track .seg.done { background: var(--dish); box-shadow: inset 0 -3px 0 rgb(0 0 0 / .18); }
-  #track .seg.now { background: color-mix(in srgb, var(--dish) 35%, transparent); }
-  #track .seg.now::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(-45deg, var(--dish) 0 5px, transparent 5px 10px); animation: slide 1s linear infinite; background-size: 28px 100%; }
-  #track .seg.pop { animation: seg-pop .6s var(--spring); }
-  @keyframes slide { to { background-position: 28px 0; } }
-  @keyframes seg-pop { 40% { transform: scaleY(1.8); } }
-  #track b { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  #track small { font-weight: 600; font-size: 13px; color: var(--muted); }
-  #track:has(+ nav:empty) { margin-right: 0; }
-  nav button { position: relative; height: 40px; padding: 0 16px; border-radius: 999px; font-weight: 700; font-size: 15px; background: var(--top);
-    box-shadow: 0 3px 0 var(--line-2); transition: transform .12s var(--spring), box-shadow .12s; }
-  nav button:hover { transform: translateY(-1px); }
-  nav button:active, nav button[aria-expanded="true"] { transform: translateY(3px); box-shadow: 0 0 0 var(--line-2); }
-  nav button[aria-expanded="true"] { background: var(--ink); color: var(--top); }
-  nav button.flag::after { content: ""; position: absolute; top: -2px; right: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--hot); box-shadow: 0 0 0 3px var(--bg); }
-  nav button.busy::after { animation: blink 1s ease-in-out infinite; }
+  header { grid-column: 1 / -1; display: flex; align-items: center; min-height: 40px; }
+  .wordmark { font-size: 22px; font-weight: 800; letter-spacing: -.04em; }
+  nav { margin-left: auto; display: flex; gap: 4px; }
+  nav button { position: relative; padding: 8px 14px; border-radius: 999px; font-weight: 500; font-size: 15px; color: var(--muted); }
+  nav button:hover, nav button[aria-expanded="true"] { color: var(--ink); background: color-mix(in srgb, var(--ink) 7%, transparent); }
+  nav button.flag::after { content: ""; position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--hot); }
 
-  /* ---------- the quest: what to do now ---------- */
-  #quest { grid-column: 1; grid-row: 2; min-height: 0; display: flex; flex-direction: column; justify-content: safe center; gap: 14px; padding: 10px 4px 14px 0;
-    overflow-y: auto; scrollbar-width: none; position: relative; z-index: 1; }
-  .card { position: relative; display: grid; gap: 16px; justify-items: start; padding: 24px 26px 26px; border-radius: 30px; background: var(--top);
-    box-shadow: 0 8px 0 var(--line-2), 0 24px 50px -24px rgb(60 40 10 / .35); }
-  .card.enter { animation: card-in .5s var(--spring) both; }
-  @keyframes card-in { from { transform: translateY(30px) scale(.94); opacity: 0; } }
-  .tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .tag { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 999px; font-weight: 700; font-size: 13px; letter-spacing: .02em;
-    background: color-mix(in srgb, var(--ink) 7%, transparent); color: var(--ink); white-space: nowrap; }
-  .tag.dish { background: var(--dish); color: #fff; text-shadow: 0 1px 0 rgb(0 0 0 / .15); }
-  .tag.dish svg { width: 18px; height: 14px; }
-  .tag.where { background: none; box-shadow: inset 0 0 0 2px var(--line-2); color: var(--muted); }
-  .tag.alarm { background: var(--alarm); color: #fff; animation: bounce .8s var(--spring) infinite; }
-  .avatar { position: relative; flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--cook); color: #fff;
-    font-weight: 900; font-size: 14px; box-shadow: inset 0 -3px 0 rgb(0 0 0 / .18); }
-  .avatar::before { content: ""; position: absolute; top: -9px; left: 50%; width: 20px; height: 12px; translate: -50% 0; border-radius: 8px 8px 3px 3px; background: #fff; box-shadow: 0 1px 0 var(--line-2); }
-  .tag.cook { padding-left: 0; background: color-mix(in srgb, var(--cook) 16%, transparent); }
-  .card h1 { margin: 0; font-weight: 800; font-size: clamp(38px, 4.4vw, 70px); line-height: .98; letter-spacing: -.035em; text-wrap: balance; }
-  .instruction { margin: 0; display: grid; gap: .35em; font-size: clamp(19px, 1.65vw, 25px); line-height: 1.28; text-wrap: pretty; }
+  /* ---------- the card: what to do now ---------- */
+  #quest { grid-column: 1; grid-row: 2; min-height: 0; display: flex; flex-direction: column; justify-content: safe center; gap: 28px; overflow-y: auto; scrollbar-width: none; }
+  .now { display: grid; gap: 18px; justify-items: start; }
+  .now.enter { animation: rise .45s var(--ease) both; }
+  @keyframes rise { from { transform: translateY(20px); opacity: 0; } }
+  .meta { display: flex; align-items: center; gap: 10px; font-weight: 500; font-size: 15px; color: var(--muted); }
+  .meta .dish { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+  .meta .dish::before { content: ""; width: 12px; height: 12px; border-radius: 4px; background: var(--dish); }
+  .meta .who { color: var(--cook); font-weight: 700; }
+  .meta .alarm { color: var(--alarm); font-weight: 700; }
+  .now h1 { margin: 0; font-weight: 800; font-size: clamp(40px, 4.6vw, 76px); line-height: .98; letter-spacing: -.035em; text-wrap: balance; }
+  .now.rung h1 { color: var(--alarm); }
+  .instruction { margin: 0; display: grid; gap: .35em; max-width: 30ch; font-size: clamp(19px, 1.7vw, 25px); line-height: 1.3; text-wrap: pretty; }
   .instruction p { margin: 0; }
-  .instruction b { font-weight: 700; background: color-mix(in srgb, var(--gold) 45%, transparent); border-radius: 6px; padding: 0 4px; margin: 0 -2px; box-decoration-break: clone; }
+  .instruction b { font-weight: 700; }
   .instruction .cue { color: var(--muted); }
-  .uses { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
-  .uses li { padding: 5px 11px; border-radius: 10px; font-size: 14px; font-weight: 500; background: color-mix(in srgb, var(--ink) 6%, transparent); }
-  .uses .amt { font-weight: 800; margin-right: 6px; }
-  .uses .out { background: color-mix(in srgb, var(--alarm) 14%, transparent); color: var(--alarm); }
-  .act { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
-  /* The one button: a real key you press down. */
-  .go { position: relative; display: inline-flex; align-items: center; gap: 16px; height: 70px; padding: 0 16px 0 34px; border-radius: 22px;
-    background: var(--go); color: #fff; font-weight: 800; font-size: 26px; letter-spacing: -.01em; text-shadow: 0 2px 0 rgb(0 0 0 / .15);
-    box-shadow: 0 8px 0 var(--go-lo), 0 14px 24px -8px color-mix(in srgb, var(--go) 60%, transparent); transform: translateY(0); transition: transform .1s, box-shadow .1s; }
-  .go::after { content: ""; position: absolute; inset: 5px 8px auto; height: 22px; border-radius: 14px 14px 30px 30px; background: linear-gradient(rgb(255 255 255 / .28), rgb(255 255 255 / 0)); pointer-events: none; }
-  .go:hover { transform: translateY(-2px); box-shadow: 0 10px 0 var(--go-lo), 0 18px 28px -8px color-mix(in srgb, var(--go) 60%, transparent); }
-  .go:active, .go.pressed { transform: translateY(8px); box-shadow: 0 0 0 var(--go-lo), 0 4px 10px -6px color-mix(in srgb, var(--go) 60%, transparent); }
-  .go kbd { display: grid; place-items: center; min-width: 38px; height: 38px; padding: 0 9px; border-radius: 11px; font: 800 17px var(--display); background: rgb(0 0 0 / .16); }
+  .uses { margin: 0; font-size: 15px; color: var(--muted); }
+  .uses .out { color: var(--alarm); }
+  .act { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .go { height: 64px; padding: 0 36px; border-radius: 20px; background: var(--go); color: #fff; font-weight: 700; font-size: 23px;
+    box-shadow: 0 6px 0 var(--go-lo); transition: transform .08s, box-shadow .08s; }
+  .go:active, .go.pressed { transform: translateY(6px); box-shadow: 0 0 0 var(--go-lo); }
   .go.alarm { --go: var(--alarm); --go-lo: #a8251a; }
-  .go.light { --go: var(--hot); --go-lo: #c35a0c; }
-  .ghost { height: 56px; padding: 0 22px; border-radius: 18px; font-weight: 700; font-size: 18px; background: var(--top); box-shadow: inset 0 0 0 3px var(--line-2), 0 5px 0 var(--line-2);
-    transition: transform .1s, box-shadow .1s; }
-  .ghost:active { transform: translateY(5px); box-shadow: inset 0 0 0 3px var(--line-2), 0 0 0 var(--line-2); }
-  .when { display: flex; align-items: baseline; gap: 10px; font-weight: 800; font-size: clamp(30px, 3vw, 44px); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
-  .when small { font-weight: 600; font-size: 15px; letter-spacing: 0; color: var(--muted); }
-  .card.alarm { box-shadow: 0 8px 0 #a8251a, 0 0 0 4px var(--alarm), 0 24px 60px -18px color-mix(in srgb, var(--alarm) 70%, transparent); animation: shake .5s ease-in-out 2; }
-  .card.alarm h1 { color: var(--alarm); }
-  @keyframes shake { 20% { transform: rotate(-1.4deg); } 60% { transform: rotate(1.4deg); } }
-  .back { justify-self: start; font-weight: 700; font-size: 14px; color: var(--muted); padding: 4px 0; }
-  .back:hover { color: var(--ink); }
-  /* Someone else's work: a smaller card. */
-  .card.small { gap: 10px; padding: 16px 18px 16px 20px; border-radius: 22px; box-shadow: 0 5px 0 var(--line-2); grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
-  .card.small h1 { font-size: clamp(22px, 2vw, 30px); letter-spacing: -.02em; }
-  .card.small .main { display: grid; gap: 8px; min-width: 0; }
-  .card.small .go { height: 52px; font-size: 18px; padding: 0 20px; border-radius: 16px; box-shadow: 0 6px 0 var(--go-lo); }
-  .card.small .go kbd { display: none; }
-  .card.small .ghost { height: 46px; font-size: 16px; padding: 0 16px; }
-  /* Up next: the queue, like the next pieces in a falling-block game. */
-  .next { display: grid; gap: 8px; }
-  .next h2 { margin: 6px 0 0 6px; font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-  .next button { display: grid; grid-template-columns: 4.6em 14px minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px 16px; border-radius: 18px; text-align: left;
-    background: color-mix(in srgb, var(--top) 55%, transparent); font-size: 17px; font-weight: 500; transition: transform .15s var(--spring), background .15s; }
-  .next button:hover { background: var(--top); transform: translateX(4px); }
-  .next small { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; color: var(--muted); }
-  .next i { width: 14px; height: 14px; border-radius: 5px; background: var(--dish); box-shadow: inset 0 -2px 0 rgb(0 0 0 / .2); }
-  .next span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .next .by { color: var(--muted); }
-  /* An empty stove: the question, and the knob to light it. */
-  .hello { margin: 0; font-size: clamp(40px, 4.4vw, 68px); font-weight: 900; line-height: .95; letter-spacing: -.045em; text-wrap: balance; }
+  .quiet { height: 52px; padding: 0 20px; border-radius: 16px; font-weight: 500; font-size: 17px; color: var(--muted); box-shadow: inset 0 0 0 2px var(--line-2); }
+  .quiet:hover { color: var(--ink); }
+  .when { font-weight: 700; font-size: clamp(28px, 2.6vw, 38px); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .back { font-weight: 500; font-size: 15px; color: var(--muted); }
+  .hello { margin: 0; font-size: clamp(40px, 4.4vw, 68px); font-weight: 800; line-height: 1; letter-spacing: -.04em; text-wrap: balance; }
   .hello.working { color: var(--muted); animation: blink 1.6s ease-in-out infinite; }
-  .ideas { display: flex; flex-wrap: wrap; gap: 8px; }
-  .ideas span { padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; background: color-mix(in srgb, var(--ink) 6%, transparent); color: var(--muted); }
-  .ideas span::before { content: "“"; } .ideas span::after { content: "”"; }
-  .sub { margin: 0; font-size: 17px; color: var(--muted); }
+  .sub { margin: 0; font-size: 18px; color: var(--muted); }
+  /* Everyone else, and anything on the counter: one line each. */
+  .also { display: grid; gap: 2px; padding-top: 18px; border-top: 2px solid var(--line); }
+  .also .row { display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 18px; }
+  .also .row > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .also .who { font-weight: 700; color: var(--cook); }
+  .also .t { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .also .rung .t { color: var(--alarm); }
+  .also button { padding: 8px 16px; border-radius: 12px; font-weight: 700; font-size: 15px; background: color-mix(in srgb, var(--ink) 7%, transparent); }
+  .also button:hover { background: color-mix(in srgb, var(--ink) 12%, transparent); }
 
-  /* ---------- the scene: wall, range, counter ---------- */
-  #scene { grid-column: 2; grid-row: 2; min-height: 0; position: relative; display: grid; place-items: center; }
-  #scene > svg { width: 100%; height: 100%; overflow: visible; }
-  .wall { fill: var(--wall); }
-  .floor { fill: var(--floor); }
-  .tiles { fill: url(#tiles); }
-  .enamel { fill: var(--enamel); }
-  .enamel-hi { fill: var(--enamel-hi); }
-  .enamel-lo { fill: var(--enamel-lo); }
-  .chrome { fill: var(--chrome); }
-  .chrome-lo { fill: var(--chrome-lo); }
+  /* ---------- the stove ---------- */
+  #scene { grid-column: 2; grid-row: 2; min-height: 0; display: grid; place-items: center; }
+  #scene > svg { width: 100%; height: 100%; max-height: 760px; overflow: visible; }
   .cooktop { fill: var(--steel); }
-  .cooktop-edge { fill: var(--steel-2); }
-  .bowl { fill: #181a16; }
-  .grate { stroke: var(--grate); stroke-width: 11; stroke-linecap: round; fill: none; }
-  .cap { fill: #34382f; }
-  .plate { font: 900 22px var(--display); fill: var(--chrome); letter-spacing: -.03em; }
-  .lcd { fill: #12140f; }
-  .lcd-text { font: 800 32px var(--display); fill: var(--hot); font-variant-numeric: tabular-nums; letter-spacing: .02em; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--hot) 70%, transparent)); }
-  .lcd-text.late { fill: var(--alarm); }
-  .lcd-label { font: 800 11px var(--display); fill: #8a7a5c; text-anchor: middle; letter-spacing: .18em; }
-  .clock { cursor: pointer; }
-  .clock:hover .lcd { fill: #1c1f18; }
-  .wood { fill: var(--wood); }
-  .wood-lo { fill: var(--wood-lo); }
-  .cab { fill: var(--cab); stroke: var(--cab-lo); stroke-width: 3; }
-  .cab-handle { fill: var(--chrome-lo); }
-  .shadow { fill: rgb(0 0 0 / .32); filter: url(#soft); }
-
-  /* Knobs turn with the heat. */
-  .knob .face { fill: var(--chrome); }
-  .knob .rim { fill: var(--chrome-lo); }
-  .knob .ptr { stroke: var(--ink); stroke-width: 5; stroke-linecap: round; }
-  .knob .turn { transform-box: fill-box; transform-origin: center; transition: transform .7s var(--spring); }
-  .knob-led { fill: #3a2a1a; transition: fill .3s; }
-  .knob.on .knob-led { fill: var(--hot); filter: drop-shadow(0 0 5px var(--hot)); }
-
-  /* Flames: a ring of petals, each flickering on its own. */
+  .front { fill: var(--enamel); }
+  .front-lo { fill: var(--enamel-lo); }
+  .lip { fill: #c9ccc6; }
+  .bowl { fill: var(--bowl); }
+  .cap { fill: #34383b; }
   .flames { opacity: 0; transition: opacity .4s; }
-  .on > .flames { opacity: 1; }
+  .on > .flames, .ignite .flames { opacity: 1; }
   .petal { fill: var(--flame); }
-  .petal.core { fill: var(--flame-2); }
   .petal-g { transform-box: fill-box; transform-origin: 50% 100%; animation: flick var(--t, .45s) ease-in-out infinite alternate; animation-delay: var(--dl, 0s); }
-  @keyframes flick { from { transform: scale(.9, .72); } to { transform: scale(1.05, 1.12); } }
+  @keyframes flick { from { transform: scale(.9, .72); } to { transform: scale(1.05, 1.1); } }
   .low .petal-g { scale: .7; }
   .rung .petal { fill: var(--alarm); }
-  /* Lighting the stove: every burner catches in turn. */
-  .ignite .burner > .flames { animation: catch 1.3s var(--ease) both; animation-delay: calc(var(--i) * .12s); }
-  @keyframes catch { 0% { opacity: 0; } 18% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: var(--rest, 0); } }
-  .ignite .knob .turn { animation: twist 1.1s var(--spring) both; animation-delay: calc(var(--i) * .12s); }
-  @keyframes twist { 30% { transform: rotate(150deg); } }
+  .ignite .flames { animation: catch 1.3s var(--ease) both; animation-delay: calc(var(--i) * .12s); }
+  @keyframes catch { 0% { opacity: 0; } 20%, 70% { opacity: 1; } 100% { opacity: var(--rest, 0); } }
 
-  /* Pots and pans, in each dish's colour. */
-  .vessel { cursor: pointer; }
-  .vessel .body { fill: var(--dish); }
-  .vessel .lid { fill: var(--dish); }
-  .vessel .lid-rim { fill: none; stroke: color-mix(in srgb, var(--dish) 70%, #000); stroke-width: 5; }
-  .vessel .shine { fill: url(#shine); pointer-events: none; }
-  .vessel .gloss { fill: url(#gloss); pointer-events: none; }
-  .vessel .lug, .vessel .handle { fill: color-mix(in srgb, var(--dish) 60%, #000); }
-  .vessel .handle-bar { stroke: #2a2b27; stroke-width: 18; stroke-linecap: round; }
-  .vessel .well { fill: #262723; }
-  .vessel .rim { fill: none; stroke: var(--dish); stroke-width: 9; }
-  .vessel .track { fill: none; stroke: rgb(0 0 0 / .22); stroke-width: 9; }
-  .vessel .bar { fill: none; stroke: #fff; stroke-width: 9; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
-  .vessel.rung .bar { stroke: var(--alarm); }
-  .vessel .big { font: 800 40px var(--display); fill: #fff; text-anchor: middle; font-variant-numeric: tabular-nums; letter-spacing: -.02em; paint-order: stroke; stroke: rgb(0 0 0 / .14); stroke-width: 4px; }
-  .vessel .small { font: 800 12.5px var(--display); fill: rgb(255 255 255 / .85); text-anchor: middle; letter-spacing: .1em; text-transform: uppercase; }
-  .vessel .word { font: 800 21px var(--display); fill: #fff; text-anchor: middle; letter-spacing: -.01em; }
-  .vessel:hover .lid, .vessel:hover .body { filter: brightness(1.06); }
-  .vessel.viewing .lid { filter: brightness(1.12); }
+  .pot { cursor: pointer; }
+  .pot .body, .pot .lid { fill: var(--dish); }
+  .pot .shade { fill: url(#shade); pointer-events: none; }
+  .pot .rim { fill: none; stroke: color-mix(in srgb, var(--dish) 72%, #000); stroke-width: 4; }
+  .pot .well { fill: #2a2b2c; }
+  .pot .handle { stroke: #2d2e2f; stroke-width: 16; stroke-linecap: round; }
+  .pot .track { fill: none; stroke: rgb(0 0 0 / .2); stroke-width: 7; }
+  .pot .bar { fill: none; stroke: #fff; stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  .pot .big { font: 700 38px var(--display); fill: #fff; text-anchor: middle; font-variant-numeric: tabular-nums; }
+  .pot .word { font: 700 20px var(--display); fill: #fff; text-anchor: middle; }
+  .pot .focus { fill: none; stroke: var(--ink); stroke-width: 4; stroke-dasharray: 10 10; animation: march 1.2s linear infinite; }
+  @keyframes march { to { stroke-dashoffset: -20; } }
   .wobble { transform-box: fill-box; transform-origin: 50% 100%; }
   .rung .wobble { animation: rattle .32s ease-in-out infinite; }
-  @keyframes rattle { 25% { transform: rotate(-3deg) translateY(-4px); } 75% { transform: rotate(3deg) translateY(-2px); } }
-  .due .wobble { animation: nudge 1.8s var(--spring) infinite; }
-  @keyframes nudge { 0%, 70%, 100% { transform: none; } 80% { transform: translateY(-10px); } 90% { transform: translateY(0) scaleY(.96); } }
-  .drop { transform-box: fill-box; transform-origin: 50% 100%; animation: drop .6s var(--spring) both; }
-  @keyframes drop { from { transform: translateY(-120px); opacity: 0; } 50% { opacity: 1; } }
-  .puff circle { fill: #fff; opacity: 0; filter: url(#puff); animation: puff 2.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
-  @keyframes puff { 0% { opacity: 0; transform: translateY(0) scale(.5); } 30% { opacity: .55; } 100% { opacity: 0; transform: translateY(-90px) scale(1.6); } }
-  .ghost-pan { fill: rgb(255 255 255 / .04); stroke: #6c7064; stroke-width: 3; stroke-dasharray: 2 10; stroke-linecap: round; }
-  .ghost-text { font: 700 14px var(--display); fill: #b8bcb0; text-anchor: middle; }
-  .ghost-when { font: 800 26px var(--display); fill: #d6d9cf; text-anchor: middle; font-variant-numeric: tabular-nums; }
+  @keyframes rattle { 25% { transform: rotate(-2.5deg) translateY(-3px); } 75% { transform: rotate(2.5deg); } }
+  .rung .bar { stroke: var(--alarm); }
+  .drop { transform-box: fill-box; transform-origin: 50% 100%; animation: drop .5s var(--spring) both; }
+  @keyframes drop { from { transform: translateY(-80px); opacity: 0; } 50% { opacity: 1; } }
+  .ghost { fill: none; stroke: #5d6166; stroke-width: 3; stroke-dasharray: 2 10; stroke-linecap: round; }
+  .ghost-text { font: 500 20px var(--display); fill: #9aa0a6; text-anchor: middle; font-variant-numeric: tabular-nums; }
+  .cook circle { fill: var(--cook); stroke: var(--steel); stroke-width: 4; }
+  .cook text { font: 800 17px var(--display); fill: #fff; text-anchor: middle; }
 
-  /* Who's on it: a little cook in a hat, bobbing. */
-  .cook-tok { animation: bob 1.4s ease-in-out infinite; transform-box: fill-box; }
-  @keyframes bob { 50% { transform: translateY(-5px); } }
-  .cook-tok .head { fill: var(--cook); stroke: #fff; stroke-width: 3.5; }
-  .cook-tok .hat { fill: #fff; }
-  .cook-tok text { font: 900 17px var(--display); fill: #fff; text-anchor: middle; }
-
-  /* The quest marker: where the thing to do now is. */
-  .marker { pointer-events: none; }
-  .marker .arrow { fill: var(--gold); stroke: var(--ink); stroke-width: 4; stroke-linejoin: round; }
-  .marker g { animation: hover 1s ease-in-out infinite; }
-  .marker.alarm .arrow { fill: var(--alarm); }
-  @keyframes hover { 50% { transform: translateY(-12px); } }
-  .alert circle { fill: var(--alarm); stroke: #fff; stroke-width: 4; }
-  .alert text { font: 900 34px var(--display); fill: #fff; text-anchor: middle; }
-  .alert g { animation: pop-bounce .6s var(--spring) infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
-  @keyframes pop-bounce { from { transform: scale(.9); } to { transform: scale(1.1) translateY(-6px); } }
-
-  /* The oven: its window lights up. */
-  .door { fill: var(--enamel); }
-  .door-hi { fill: var(--enamel-hi); }
-  .window { fill: #121310; }
-  .glow { fill: url(#oven-glow); opacity: 0; transition: opacity 1.2s; }
+  .window { fill: #141516; }
+  .glow { fill: url(#glow); opacity: 0; transition: opacity 1.2s; }
   .oven.hot .glow { opacity: 1; }
-  .element { fill: none; stroke: #3b2d22; stroke-width: 5; stroke-linejoin: round; transition: stroke .8s; }
-  .oven.hot .element { stroke: var(--hot); filter: drop-shadow(0 0 6px var(--hot)); }
-  .rack { stroke: #3d3f39; stroke-width: 4; }
+  .handlebar { fill: #c9ccc6; }
   .tray { cursor: pointer; }
-  .tray .dish-body { fill: var(--dish); }
-  .tray .dish-lip { fill: color-mix(in srgb, var(--dish) 70%, #000); }
-  .tray text { font: 800 15px var(--display); fill: #fff; text-anchor: middle; }
-  .tray .t { font-size: 26px; font-variant-numeric: tabular-nums; }
-  .tray .track { stroke: rgb(255 255 255 / .18); stroke-width: 6; stroke-linecap: round; }
-  .tray .bar { stroke: #fff; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
-  .tray.rung .dish-body { fill: var(--alarm); }
-  .oven-label { font: 800 13px var(--display); fill: rgb(255 255 255 / .55); letter-spacing: .14em; }
-  .oven-next { font: 700 16px var(--display); fill: rgb(255 255 255 / .45); text-anchor: middle; }
+  .tray text { font: 700 22px var(--display); fill: #fff; }
+  .tray .t { text-anchor: end; font-variant-numeric: tabular-nums; }
+  .tray .track { stroke: rgb(255 255 255 / .2); stroke-width: 5; stroke-linecap: round; }
+  .tray .bar { stroke: #fff; stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+  .tray.rung text { fill: #ffd2c9; }
+  .tray .focus { fill: none; stroke: #fff; stroke-width: 3; stroke-dasharray: 8 8; animation: march 1.2s linear infinite; }
 
-  /* The counter: boards for prep and resting, a kitchen timer for loose ones. */
-  .board { cursor: pointer; }
-  .board .slab { fill: #f2d7a8; }
-  .board .edge { fill: #c99a5c; }
-  .board .title { font: 700 19px var(--display); fill: #3b2a14; }
-  .board .label { font: 800 11.5px var(--display); fill: #8a6533; letter-spacing: .12em; text-transform: uppercase; }
-  .board .t { font: 800 24px var(--display); fill: #3b2a14; font-variant-numeric: tabular-nums; text-anchor: end; }
-  .board .dot { fill: var(--dish); }
-  .board.rung .slab { fill: #ffd2c9; }
-  .board.rung .t { fill: var(--alarm); }
-  .egg .shell { fill: var(--gold); }
-  .egg .band { fill: #fff; }
-  .egg.rung .shell { fill: var(--alarm); }
-
-  /* ---------- bottom: Basil ---------- */
-  footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; min-height: 92px; position: relative; z-index: 2; }
-  #pilot { position: relative; flex: none; width: 84px; height: 84px; touch-action: none; transition: transform .15s var(--spring); }
-  #pilot:hover { transform: scale(1.05) rotate(-3deg); }
+  /* ---------- Basil ---------- */
+  footer { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; min-height: 80px; }
+  #pilot { flex: none; width: 64px; height: 64px; touch-action: none; transition: transform .15s var(--spring); }
   #pilot:active { transform: scale(.92); }
   #pilot svg { width: 100%; height: 100%; overflow: visible; }
   #pilot .leaf { fill: var(--enamel); }
-  #pilot .leaf-hi { fill: var(--enamel-hi); }
-  #pilot .vein { stroke: var(--enamel-lo); stroke-width: 3; fill: none; stroke-linecap: round; }
   #pilot .eye { fill: #fff; }
   #pilot .pupil { fill: var(--ink); transition: transform .3s var(--spring); }
-  #pilot .lids { fill: var(--enamel); transform-box: fill-box; transform-origin: 50% 0; transform: scaleY(0); }
-  #pilot .mouth { fill: #3b1610; transform-box: fill-box; transform-origin: 50% 0; transition: transform .08s; }
-  #pilot .shut { fill: none; stroke: var(--ink); stroke-width: 3.5; stroke-linecap: round; opacity: 0; }
-  #pilot[data-mode="asleep"] .shut { opacity: 1; }
-  #pilot .cheek { fill: #ff8f7a; opacity: .55; }
+  #pilot .shut { fill: none; stroke: #fff; stroke-width: 4; stroke-linecap: round; opacity: 0; }
+  #pilot .open { transition: opacity .2s; }
+  #pilot .mouth { fill: #1d3b2a; transform-box: fill-box; transform-origin: 50% 0; transition: transform .08s; }
+  #pilot .ring { fill: none; stroke: var(--flame); stroke-width: 4; opacity: 0; transform-box: fill-box; transform-origin: center; }
   #pilot .body { transform-box: fill-box; transform-origin: 50% 100%; }
-  #pilot .halo-ring { fill: none; stroke: var(--flame); stroke-width: 4; opacity: 0; }
-  #pilot .zz { font: 900 16px var(--display); fill: var(--muted); opacity: 0; }
-  #pilot .dots circle { fill: var(--muted); opacity: 0; }
-  #pilot .mute { stroke: var(--alarm); stroke-width: 6; stroke-linecap: round; opacity: 0; }
-  #pilot[data-mode="asleep"] .lids { transform: scaleY(1); }
-  #pilot[data-mode="asleep"] .zz { animation: zz 2.4s ease-out infinite; }
-  #pilot[data-mode="asleep"] .zz + .zz { animation-delay: 1.2s; }
-  @keyframes zz { 0% { opacity: 0; transform: translate(0, 0); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(14px, -22px); } }
+  #pilot[data-mode="asleep"] .open, #pilot[data-mode="off"] .open { opacity: 0; }
+  #pilot[data-mode="asleep"] .shut, #pilot[data-mode="off"] .shut { opacity: 1; }
   #pilot[data-mode="asleep"] .body { animation: snooze 3s ease-in-out infinite; }
   @keyframes snooze { 50% { transform: scale(1.03, .97); } }
-  #pilot[data-mode="listening"] .lids, #pilot[data-mode="ready"] .lids { animation: blink-lid 4s infinite; }
-  @keyframes blink-lid { 0%, 94%, 100% { transform: scaleY(0); } 97% { transform: scaleY(1); } }
-  #pilot[data-mode="you"] .halo-ring { opacity: 1; animation: ping 1.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
-  @keyframes ping { from { transform: scale(.9); opacity: .9; } to { transform: scale(1.35); opacity: 0; } }
-  #pilot[data-mode="you"] .body { animation: lean 1s ease-in-out infinite; }
-  @keyframes lean { 50% { transform: rotate(-4deg); } }
-  #pilot[data-mode="thinking"] .pupil { transform: translate(3px, -4px); }
-  #pilot[data-mode="thinking"] .dots circle { animation: dots 1.2s ease-in-out infinite; }
-  #pilot[data-mode="thinking"] .dots circle:nth-child(2) { animation-delay: .2s; }
-  #pilot[data-mode="thinking"] .dots circle:nth-child(3) { animation-delay: .4s; }
-  @keyframes dots { 0%, 100% { opacity: .2; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-5px); } }
-  #pilot[data-mode="talking"] .body { animation: talk-bob .5s ease-in-out infinite; }
-  @keyframes talk-bob { 50% { transform: translateY(-3px) scale(1.01, .99); } }
-  #pilot[data-mode="off"] .mute { opacity: 1; }
-  #pilot[data-mode="off"] .lids { transform: scaleY(.55); }
+  #pilot[data-mode="you"] .ring { opacity: 1; animation: ping 1.2s ease-out infinite; }
+  @keyframes ping { from { transform: scale(.9); opacity: .9; } to { transform: scale(1.3); opacity: 0; } }
+  #pilot[data-mode="thinking"] .pupil { transform: translate(2px, -3px); }
+  #pilot[data-mode="talking"] .body { animation: talk .5s ease-in-out infinite; }
+  @keyframes talk { 50% { transform: translateY(-2px); } }
   #pilot.hop .body { animation: hop .6s var(--spring); }
-  @keyframes hop { 30% { transform: translateY(-22px) rotate(-8deg); } 60% { transform: translateY(0) scale(1.08, .9); } }
-  #lines { min-width: 0; flex: 1; display: grid; gap: 6px; justify-items: start; }
-  .bubble { position: relative; max-width: min(820px, 100%); margin: 0; padding: 12px 18px; border-radius: 20px; background: var(--top); box-shadow: 0 4px 0 var(--line-2);
-    font-size: clamp(17px, 1.5vw, 21px); line-height: 1.32; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  #basil::before { content: ""; position: absolute; left: -9px; bottom: 16px; width: 18px; height: 18px; background: var(--top); transform: rotate(45deg); border-radius: 3px; }
-  #basil { overflow: visible; }
-  #basil > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  @keyframes hop { 30% { transform: translateY(-16px) rotate(-6deg); } }
+  #lines { min-width: 0; flex: 1; display: grid; gap: 4px; }
+  .line { margin: 0; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #you { font-size: 15px; color: var(--muted); }
+  #you.live { color: var(--ink); }
+  #basil { font-size: clamp(18px, 1.6vw, 22px); line-height: 1.35; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   #basil.pondering { color: var(--muted); }
   #basil i { font-style: normal; animation: b-fade .25s ease-out; }
-  #you { font-size: 15px; padding: 7px 14px; border-radius: 14px; background: color-mix(in srgb, var(--ink) 7%, transparent); box-shadow: none; color: var(--muted); -webkit-line-clamp: 1; }
-  #you.live { color: var(--ink); background: color-mix(in srgb, var(--flame) 16%, transparent); }
-  #status { font-weight: 700; font-size: 14px; color: var(--muted); padding-left: 4px; }
-  #status.working { color: var(--ink); animation: blink 1.6s ease-in-out infinite; }
-  .keys { margin-left: auto; flex: none; display: flex; gap: 14px; font-size: 13px; font-weight: 600; color: var(--muted); }
-  .keys kbd { display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 7px; margin-right: 6px; border-radius: 8px; background: var(--top);
-    box-shadow: 0 3px 0 var(--line-2); font: 800 12px var(--display); color: var(--ink); }
+  #status { font-weight: 500; font-size: 14px; color: var(--muted); animation: blink 1.6s ease-in-out infinite; }
   @keyframes blink { 50% { opacity: .45; } }
-  @keyframes bounce { 50% { transform: translateY(-3px); } }
 
-  /* Confetti for a step well done. */
-  .bit { position: fixed; z-index: 70; width: 10px; height: 14px; border-radius: 3px; pointer-events: none; }
-
-  /* ---------- narrow: the card on top, the stove under it ---------- */
   @media (max-width: 960px), (max-aspect-ratio: 1/1) {
-    body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; row-gap: 10px; }
-    #quest { grid-row: 2; justify-content: start; overflow: visible; padding: 4px 0 6px; }
+    body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; row-gap: 16px; }
+    #quest { grid-row: 2; justify-content: start; overflow: visible; gap: 16px; }
     #scene { grid-column: 1; grid-row: 3; }
-    #track { width: auto; flex: 1; margin: 0 4px; }
-    .card { padding: 18px 20px 20px; gap: 12px; }
-    .card h1 { font-size: clamp(30px, 8vw, 50px); }
-    .instruction { font-size: clamp(17px, 4.3vw, 21px); }
-    .next, .ideas { display: none; }
-    .card.small { padding: 10px 12px 10px 14px; border-radius: 18px; }
-    .card.small .tag.dish, .card.small .tag.where { display: none; }
-    .card.small .main { grid-auto-flow: column; justify-content: start; align-items: center; gap: 10px; }
-    .card.small h1 { font-size: 19px; }
-    .card.small .go { height: 42px; font-size: 16px; padding: 0 16px; box-shadow: 0 4px 0 var(--go-lo); }
-    .card.small .tag.cook { padding-right: 0; background: none; font-size: 0; gap: 0; }
-    #scene { min-height: 34vh; }
-    #track .segs { display: none; }
-    .keys { display: none; }
+    .now { gap: 12px; }
+    .now h1 { font-size: clamp(32px, 8vw, 52px); }
+    .instruction { font-size: clamp(17px, 4.3vw, 21px); max-width: none; }
   }
   @media (max-width: 640px) {
-    /* A phone scrolls: the card, then the stove, with Basil pinned to the bottom. */
     html, body { height: auto; min-height: 100%; }
     body { overflow-y: auto; grid-template-rows: auto auto auto auto; }
-    #scene { overflow: clip; border-radius: 22px; min-height: 0; }
     #scene > svg { height: auto; }
-    footer { position: sticky; bottom: 0; padding-block: 8px; margin-inline: -16px; padding-inline: 16px; background: linear-gradient(transparent, var(--bg) 30%); }
-    nav button { padding: 0 12px; font-size: 14px; }
-    .go { height: 60px; font-size: 21px; padding: 0 22px; }
-    .go kbd { display: none; }
+    footer { position: sticky; bottom: 0; margin-inline: -16px; padding: 8px 16px; background: var(--bg); min-height: 64px; }
+    #pilot { width: 52px; height: 52px; }
+    .go { height: 56px; font-size: 20px; }
     .uses { display: none; }
-    footer { min-height: 72px; }
-    #pilot { width: 64px; height: 64px; }
-    .bubble { font-size: 16px; }
   }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <header>
-  <span class="wordmark" aria-label="Basil"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 15C3 13 2 7 4 3c3 0 9 2 9 7 0 3-2 5-5 5z" fill="var(--enamel)"/><path d="M8 15C7 11 6 7 4 3" stroke="var(--enamel-lo)" stroke-width="1.4" fill="none" stroke-linecap="round"/></svg>basil</span>
-  <button id="track" hidden aria-label="The plan"></button>
+  <span class="wordmark">basil</span>
   <nav id="nav" aria-label="More"></nav>
 </header>
 <main id="quest" aria-live="polite"></main>
 <div id="scene" aria-hidden="true"></div>
 <footer>
   <button id="pilot" data-mode="asleep" aria-label="Talk to Basil">
-    <svg viewBox="-50 -56 100 106" aria-hidden="true">
-      <circle class="halo-ring" cx="0" cy="0" r="44"/>
+    <svg viewBox="-46 -52 92 100" aria-hidden="true">
+      <circle class="ring" cx="0" cy="0" r="42"/>
       <g class="body">
-        <path class="leaf" d="M0 46 C-34 40 -46 10 -40 -18 C-36 -38 -14 -50 4 -52 C30 -46 44 -24 42 2 C40 28 22 44 0 46 Z"/>
-        <path class="leaf-hi" d="M-30 -20 C-26 -36 -12 -44 2 -46 C-12 -38 -22 -28 -26 -12 Z" opacity=".6"/>
-        <path class="vein" d="M0 44 C2 30 2 14 4 -4"/>
-        <ellipse class="cheek" cx="-24" cy="6" rx="7" ry="4.5"/>
-        <ellipse class="cheek" cx="26" cy="6" rx="7" ry="4.5"/>
-        <g><ellipse class="eye" cx="-13" cy="-12" rx="9" ry="11"/><circle class="pupil" cx="-12" cy="-10" r="5"/></g>
-        <g><ellipse class="eye" cx="15" cy="-12" rx="9" ry="11"/><circle class="pupil" cx="16" cy="-10" r="5"/></g>
-        <rect class="lids" x="-24" y="-25" width="50" height="26" rx="11"/>
-        <path class="shut" d="M-21 -11 Q-13 -4 -5 -11 M7 -11 Q15 -4 23 -11"/>
-        <path class="mouth" id="mouth" d="M-8 8 Q1 10 10 8 Q9 18 1 18 Q-7 18 -8 8 Z"/>
+        <path class="leaf" d="M0 44 C-32 38 -44 10 -38 -16 C-34 -36 -14 -48 4 -50 C28 -44 42 -22 40 2 C38 26 22 42 0 44 Z"/>
+        <g class="open">
+          <ellipse class="eye" cx="-12" cy="-10" rx="8" ry="10"/><circle class="pupil" cx="-11" cy="-8" r="4.5"/>
+          <ellipse class="eye" cx="14" cy="-10" rx="8" ry="10"/><circle class="pupil" cx="15" cy="-8" r="4.5"/>
+        </g>
+        <path class="shut" d="M-19 -9 Q-12 -3 -5 -9 M7 -9 Q14 -3 21 -9"/>
+        <path class="mouth" id="mouth" d="M-7 9 Q1 11 9 9 Q8 17 1 17 Q-6 17 -7 9 Z"/>
       </g>
-      <text class="zz" x="26" y="-38">z</text><text class="zz" x="26" y="-38">z</text>
-      <g class="dots"><circle cx="30" cy="-44" r="4"/><circle cx="40" cy="-50" r="4"/><circle cx="50" cy="-56" r="4"/></g>
-      <path class="mute" d="M-34 -34 L34 34"/>
     </svg>
   </button>
   <div id="lines">
     <p class="line" id="status" hidden></p>
-    <p class="bubble" id="you" hidden></p>
-    <p class="bubble" id="basil" hidden><span></span></p>
+    <p class="line" id="you" hidden></p>
+    <p class="line" id="basil" hidden></p>
   </div>
-  <span class="keys" id="keys"></span>
 </footer>
 
 <script src="/core.js"></script>
 <script>
-// ---------- the scene ----------
-// The camera looks at the range from the front and a little above: across stays across, depth is squashed by K,
-// and height goes straight up. So a burner is an ellipse, a pot is a cylinder, and the oven door faces you.
+// ---------- the stove ----------
+// Seen from the front and a little above: across stays across, depth is squashed by K, height goes straight up. A
+// burner is an ellipse, a pot a cylinder, and the oven door faces you.
 const K = 0.5;
-const W = 1100, H = 900;
-const RANGE = { x: 30, w: 700, guard: 64, top: 150, depth: 320, lip: 18, front: 360 };
-const TOP_Y = RANGE.top, FRONT_Y = RANGE.top + RANGE.depth + RANGE.lip, FLOOR_Y = FRONT_Y + RANGE.front;
-const COUNTER = { x: RANGE.x + RANGE.w, w: 340 };
+const RX = 0, RW = 700, TOP = 0, DEPTH = 300, LIP = 14;
+const FRONT = TOP + DEPTH + LIP, BOTTOM = FRONT + 300;
 
 const ellipsePath = (cx, cy, rx, ry) => `M${cx} ${cy - ry}A${rx} ${ry} 0 1 1 ${cx} ${cy + ry}A${rx} ${ry} 0 1 1 ${cx} ${cy - ry}`;
 const cylinder = (cx, cy, rx, ry, hgt) => `M${cx - rx} ${cy - hgt}L${cx - rx} ${cy}A${rx} ${ry} 0 0 0 ${cx + rx} ${cy}L${cx + rx} ${cy - hgt}Z`;
 const cookColor = (i) => `var(--c${(i ?? 0) % 4})`;
-const HIGH = /\b(sear|boil|fry|brown|char|blanch|stir-fry|scorch|toast)\b/i;
-const LOW = /\b(simmer|low|warm|melt|poach|gentle|reduce)\b/i;
+const LOW = /\b(simmer|low|warm|melt|poach|gentle)\b/i;
 
 function burnerGrid(B) {
   const rows = B > 2 ? 2 : 1, cols = Math.ceil(B / rows);
-  const x0 = RANGE.x + 30, w = RANGE.w - 60, d = RANGE.depth - 20;
-  const cw = w / cols, rh = d / rows;
+  const cw = (RW - 40) / cols, rh = (DEPTH - 20) / rows;
   const r = Math.min(cw * 0.4, (rh / K) * 0.38, 130);
   return Array.from({ length: B }, (_, b) => {
     const row = rows === 1 ? 0 : b < cols ? 0 : 1, col = rows === 1 ? b : b % cols;
-    const name = [rows > 1 ? (row ? "front" : "back") : "", cols === 1 ? "" : cols === 2 ? ["left", "right"][col] : col === 0 ? "left" : col === cols - 1 ? "right" : "middle"].filter(Boolean).join("-");
-    return { b, row, col, r, cx: x0 + cw * (col + 0.5), cy: TOP_Y + 10 + rh * (row + 0.5), name: name || "the" };
+    return { b, row, r, cx: RX + 20 + cw * (col + 0.5), cy: TOP + 10 + rh * (row + 0.5) };
   });
 }
 
-function petals(cx, cy, rx, ry, n, front) {
-  const g = s("g", { class: "flames" });
+function petals(cx, cy, rx, ry, front) {
+  const g = s("g", { class: "flames" }), n = 20;
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2, x = cx + Math.cos(a) * rx, y = cy + Math.sin(a) * ry;
+    const a = (i / n) * Math.PI * 2;
     if ((Math.sin(a) > 0) !== front) continue;
-    const scale = 0.9 + 0.25 * Math.sin(a * 3 + 1);
-    g.append(s("g", { transform: `translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${scale.toFixed(2)})` },
-      s("g", { class: "petal-g", style: `--t: ${(0.32 + ((i * 37) % 10) / 40).toFixed(2)}s; --dl: ${(-((i * 53) % 10) / 20).toFixed(2)}s` },
-        s("path", { class: "petal", d: "M0 0C-7 -2 -7 -12 0 -26C7 -12 7 -2 0 0Z" }),
-        s("path", { class: "petal core", d: "M0 -1C-3 -2 -3 -7 0 -13C3 -7 3 -2 0 -1Z" }))));
+    g.append(s("g", { transform: `translate(${(cx + Math.cos(a) * rx).toFixed(1)} ${(cy + Math.sin(a) * ry).toFixed(1)})` },
+      s("path", { class: "petal petal-g", d: "M0 0C-6 -2 -6 -11 0 -22C6 -11 6 -2 0 0Z", style: `--t: ${(0.32 + ((i * 37) % 10) / 40).toFixed(2)}s; --dl: ${(-((i * 53) % 10) / 20).toFixed(2)}s` })));
   }
   return g;
 }
 
-function cookToken(x, y, i) {
-  const name = state.cooks[i] || "";
-  return s("g", { style: `--cook: ${cookColor(i)}`, transform: `translate(${x} ${y})` },
-    s("g", { class: "cook-tok" },
-      s("path", { class: "hat", d: "M-14 -24 C-22 -26 -22 -40 -12 -40 C-10 -48 10 -48 12 -40 C22 -40 22 -26 14 -24 Z" }),
-      s("circle", { class: "head", cx: 0, cy: 0, r: 22 }),
-      s("text", { y: 6 }, (name[0] || "?").toUpperCase())));
-}
-
-// Where the thing to do now is: a big arrow, hovering.
-function marker(x, y, alarm) {
-  return s("g", { class: `marker${alarm ? " alarm" : ""}`, transform: `translate(${x} ${y})` },
-    s("g", {}, s("path", { class: "arrow", d: "M-22 -44 L22 -44 L22 -18 L36 -18 L0 14 L-36 -18 L-22 -18 Z" })));
-}
-
-function timeText(tm, x, y, cls, fallback) {
-  if (!tm) return s("text", { class: cls, x, y }, fallback);
+function timeText(tm, x, y, cls) {
   if (tm.paused) return s("text", { class: cls, x, y }, clock(tm.left));
   return s("text", { class: cls, x, y, "data-until": tm.until, "data-clock": "" }, clock((tm.until - Date.now()) / 1000));
 }
-const ringAttrs = (tm) => tm && { "data-ring": "", "data-until": tm.paused ? "" : tm.until, "data-total": tm.total, "data-left": tm.left ?? "", pathLength: 100,
-  "stroke-dasharray": 100, "stroke-dashoffset": (100 * (1 - remaining(tm))).toFixed(2) };
+const ringAttrs = (tm) => ({ "data-ring": "", "data-until": tm.paused ? "" : tm.until, "data-total": tm.total, "data-left": tm.left ?? "",
+  pathLength: 100, "stroke-dasharray": 100, "stroke-dashoffset": (100 * (1 - remaining(tm))).toFixed(2) });
 
-// A pot (lid on, for boiling and simmering) or a pan (open, with a long handle, for everything else).
-function vessel(g, pan, primary) {
+// A pot for boiling and simmering, an open pan for the rest. The time left runs round the rim and is written on top.
+function pot(g, pan, focus) {
   const { cx, cy, r } = g, st = pan.step;
-  const rx = r * 0.86, ry = rx * K, isPot = pan.pot, hgt = isPot ? rx * 0.5 : rx * 0.2;
-  const heat = st.status === "in_progress" && !(st.hands_on && !pan.timing && false);
-  const words = `${st.title} ${st.text}`;
-  const level = HIGH.test(words) ? "high" : LOW.test(words) ? "low" : "mid";
-  const due = st.status === "pending";
-  const cls = ["vessel", "burner", heat && "on", heat && level === "low" && "low", pan.rung && "rung", due && "due", pan.viewing && "viewing"].filter(Boolean).join(" ");
-  const top = cy - hgt;
-  const el = s("g", { class: cls, style: `--dish: ${dishColor(st.dish)}; --i: ${g.b}; --rest: ${heat ? 1 : 0}`, "data-key": pan.key, onclick: () => view(st.id) });
-  el.append(petals(cx, cy, rx * 1.06, ry * 1.06, 22, false));
+  const rx = r * 0.86, ry = rx * K, hgt = pan.pot ? rx * 0.45 : rx * 0.18, top = cy - hgt;
+  const on = st.status === "in_progress";
+  const el = s("g", { class: ["pot", on && "on", on && LOW.test(`${st.title} ${st.text}`) && "low", pan.rung && "rung"].filter(Boolean).join(" "),
+    style: `--dish: ${dishColor(st.dish)}; --i: ${g.b}; --rest: ${on ? 1 : 0}`, "data-key": pan.key, onclick: () => view(st.id) });
+  el.append(petals(cx, cy, rx * 1.06, ry * 1.06, false));
   const w = s("g", { class: "wobble" });
-  w.append(s("ellipse", { class: "shadow", cx: cx + 8, cy: cy + 6, rx: rx * 1.02, ry: ry * 1.02 }));
-  if (!isPot) w.append(s("line", { class: "handle-bar", x1: cx + rx * 0.9, y1: top + 4, x2: cx + rx + r * 0.75, y2: top + ry * 0.9 }));
-  else for (const side of [-1, 1]) w.append(s("rect", { class: "lug", x: side < 0 ? cx - rx - 16 : cx + rx - 4, y: top + hgt * 0.18, width: 20, height: 14, rx: 7 }));
-  w.append(s("path", { class: "body", d: cylinder(cx, cy, rx, ry, hgt) }), s("path", { class: "shine", d: cylinder(cx, cy, rx, ry, hgt) }));
-  if (isPot) {
-    w.append(s("ellipse", { class: "lid", cx, cy: top, rx, ry }), s("ellipse", { class: "lid-rim", cx, cy: top, rx: rx - 3, ry: ry - 2 }),
-      s("ellipse", { class: "gloss", cx, cy: top, rx, ry }));
+  if (!pan.pot) w.append(s("line", { class: "handle", x1: cx + rx * 0.9, y1: top + 4, x2: cx + rx + r * 0.7, y2: top + ry * 0.8 }));
+  w.append(s("path", { class: "body", d: cylinder(cx, cy, rx, ry, hgt) }), s("path", { class: "shade", d: cylinder(cx, cy, rx, ry, hgt) }),
+    s("ellipse", { class: "lid", cx, cy: top, rx, ry }));
+  if (pan.pot) w.append(s("ellipse", { class: "rim", cx, cy: top, rx: rx - 2, ry: ry - 1 }));
+  else w.append(s("ellipse", { class: "well", cx, cy: top + 2, rx: rx - 11, ry: ry - 6 }));
+  const tm = pan.timing, big = Math.min(40, rx * 0.38);
+  if (tm && !pan.rung) {
+    w.append(s("path", { class: "track", d: ellipsePath(cx, top, rx - 10, ry - 6) }), s("path", { class: "bar", d: ellipsePath(cx, top, rx - 10, ry - 6), ...ringAttrs(tm) }));
+    const t = timeText(tm, cx, top + big * 0.36, "big"); t.style.fontSize = `${big}px`; w.append(t);
+  } else if (pan.rung) {
+    w.append(s("text", { class: "big", x: cx, y: top + big * 0.36, style: `font-size: ${big}px` }, "Done"));
   } else {
-    w.append(s("ellipse", { class: "lid", cx, cy: top, rx, ry }), s("ellipse", { class: "well", cx, cy: top + 2, rx: rx - 12, ry: ry - 7 }));
+    w.append(s("text", { class: "word", x: cx, y: top + 7, style: `font-size: ${Math.min(20, rx * 0.19)}px` }, pan.rung ? "Done" : st.status === "pending" ? "Start" : st.title.split(" ")[0]));
   }
-  // The time left goes round the rim; the time itself, and the dish, are written on top.
-  const tm = pan.timing;
-  if (tm) w.append(s("path", { class: "track", d: ellipsePath(cx, top, rx - 9, ry - 5) }), s("path", { class: "bar", d: ellipsePath(cx, top, rx - 9, ry - 5), ...ringAttrs(tm) }));
-  const big = Math.min(44, rx * 0.4);
-  w.append(s("text", { class: "small", x: cx, y: top - big * 0.62 }, abbreviate(st.dish, Math.round(rx / 7.5))));
-  if (pan.rung) w.append(s("text", { class: "big", x: cx, y: top + big * 0.42, style: `font-size: ${big}px` }, "Done!"));
-  else if (tm) { const t = timeText(tm, cx, top + big * 0.42, "big"); t.setAttribute("style", `font-size: ${big}px`); w.append(t); }
-  else w.append(s("text", { class: "word", x: cx, y: top + big * 0.3, style: `font-size: ${Math.min(22, rx * 0.2)}px` }, due ? "Start" : abbreviate(st.title, Math.round(rx / 8))));
-  if (heat && isPot) {
-    const puff = s("g", { class: "puff" });
-    [[-0.3, 0], [0.1, 0.9], [0.35, 1.7]].forEach(([dx, dl]) => puff.append(s("circle", { cx: cx + rx * dx, cy: top - ry * 0.5, r: rx * 0.16, style: `animation-delay: ${dl}s` })));
-    w.append(puff);
+  el.append(w, petals(cx, cy, rx * 1.06, ry * 1.06, true));
+  if (focus) el.append(s("ellipse", { class: "focus", cx, cy, rx: rx * 1.22, ry: ry * 1.22 }));
+  if (st.hands_on && st.cook != null && state.cooks.length > 1) {
+    el.append(s("g", { class: "cook", style: `--cook: ${cookColor(st.cook)}`, transform: `translate(${cx - rx + 4} ${cy + ry * 0.6})` },
+      s("circle", { r: 18 }), s("text", { y: 6 }, (state.cooks[st.cook]?.[0] || "?").toUpperCase())));
   }
-  el.append(w, petals(cx, cy, rx * 1.06, ry * 1.06, 22, true));
-  if (st.hands_on && st.cook != null && state.cooks.length > 1) el.append(cookToken(cx - rx + 6, cy + ry * 0.55, st.cook));
-  if (pan.rung) el.append(s("g", { class: "alert", transform: `translate(${cx + rx * 0.75 * (g.col === 0 ? -1 : 1)} ${top - ry - 10})` }, s("g", {}, s("circle", { r: 26 }), s("text", { y: 12 }, "!"))));
-  if (primary) el.append(marker(cx, top - ry - (pan.rung ? 60 : 24), pan.rung));
   return el;
 }
 
-function emptyBurner(g, ghost) {
+function burner(g, ghost) {
   const { cx, cy, r } = g;
   const el = s("g", { class: "burner", style: `--i: ${g.b}` });
-  el.append(petals(cx, cy, r * 0.42, r * 0.42 * K, 14, false), petals(cx, cy, r * 0.42, r * 0.42 * K, 14, true));
+  el.append(petals(cx, cy, r * 0.42, r * 0.42 * K, false), petals(cx, cy, r * 0.42, r * 0.42 * K, true));
   if (ghost) {
     const rx = r * 0.86;
-    el.append(s("ellipse", { class: "ghost-pan", cx, cy: cy - 8, rx, ry: rx * K }),
-      s("text", { class: "ghost-when", x: cx, y: cy - 2, "data-until": ghost.at, "data-in": "" }, `in ${hours((ghost.at - Date.now()) / 60000)}`),
-      s("text", { class: "ghost-text", x: cx, y: cy + 22 }, abbreviate(ghost.step.title, 22)));
+    el.append(s("ellipse", { class: "ghost", cx, cy: cy - 6, rx, ry: rx * K }),
+      s("text", { class: "ghost-text", x: cx, y: cy + 1, "data-until": ghost.at, "data-in": "" }, `in ${hours((ghost.at - Date.now()) / 60000)}`));
     el.style.cursor = "pointer";
     el.addEventListener("click", () => view(ghost.step.id));
   }
   return el;
 }
 
-function grate(g) {
-  const { cx, cy, r } = g;
-  const out = s("g", {});
-  out.append(s("ellipse", { class: "bowl", cx, cy, rx: r, ry: r * K }));
-  for (const a of [0.25, 0.75, 1.25, 1.75]) {
-    const t = a * Math.PI;
-    out.append(s("line", { class: "grate", x1: cx + Math.cos(t) * r * 0.2, y1: cy + Math.sin(t) * r * 0.2 * K, x2: cx + Math.cos(t) * r * 1.02, y2: cy + Math.sin(t) * r * 1.02 * K }));
-  }
-  out.append(s("ellipse", { class: "cap", cx, cy, rx: r * 0.3, ry: r * 0.3 * K }));
-  return out;
-}
-
-function knob(x, y, on, low, i) {
-  return s("g", { class: `knob${on ? " on" : ""}`, style: `--i: ${i}`, transform: `translate(${x} ${y})` },
-    s("circle", { class: "knob-led", cx: 0, cy: -34, r: 4 }),
-    s("circle", { class: "rim", cx: 0, cy: 3, r: 22 }),
-    s("g", { class: "turn", style: `transform: rotate(${on ? (low ? 60 : 140) : 0}deg)` },
-      s("circle", { class: "face", cx: 0, cy: 0, r: 22 }), s("line", { class: "ptr", x1: 0, y1: -6, x2: 0, y2: -17 })));
-}
-
-function ovenDoor(x, y, w, hgt, oven, i) {
-  const el = s("g", { class: `oven${oven.hot ? " hot" : ""}` });
-  el.append(s("rect", { class: "enamel-lo", x: x - 2, y: y + 6, width: w + 4, height: hgt, rx: 22 }),
-    s("rect", { class: "door", x, y, width: w, height: hgt, rx: 20 }),
-    s("rect", { class: "chrome", x: x + 40, y: y + 16, width: w - 80, height: 14, rx: 7 }),
-    s("rect", { class: "chrome-lo", x: x + 40, y: y + 26, width: w - 80, height: 4, rx: 2 }));
-  const wx = x + 36, wy = y + 48, ww = w - 72, wh = hgt - 74;
-  el.append(s("rect", { class: "window", x: wx, y: wy, width: ww, height: wh, rx: 16 }), s("rect", { class: "glow", x: wx, y: wy, width: ww, height: wh, rx: 16 }));
-  let zig = `M${wx + 18} ${wy + 18}`;
-  for (let k = 1; k <= 12; k++) zig += `L${wx + 18 + ((ww - 36) * k) / 12} ${wy + (k % 2 ? 28 : 18)}`;
-  el.append(s("path", { class: "element", d: zig }));
-  const racks = [wy + wh * 0.56, wy + wh * 0.9];
-  racks.forEach((ry) => el.append(s("line", { class: "rack", x1: wx + 10, y1: ry, x2: wx + ww - 10, y2: ry })));
-  el.append(s("text", { class: "oven-label", x: wx + 18, y: wy + wh - 12 }, oven.heating ? `HEATING${oven.heating.timing ? "" : ""}` : oven.items.length ? "" : "OVEN"));
-  const items = oven.items.length > 1 ? oven.items : oven.items;
+// The oven's window lights up with what's in it.
+function oven(x, y, w, hgt, o, focusId) {
+  const el = s("g", { class: `oven${o.hot ? " hot" : ""}` });
+  const wx = x + 30, wy = y + 40, ww = w - 60, wh = hgt - 64;
+  el.append(s("rect", { class: "handlebar", x: x + 50, y: y + 12, width: w - 100, height: 10, rx: 5 }),
+    s("rect", { class: "window", x: wx, y: wy, width: ww, height: wh, rx: 14 }), s("rect", { class: "glow", x: wx, y: wy, width: ww, height: wh, rx: 14 }));
+  const items = o.heating ? [o.heating, ...o.items].slice(0, 2) : o.items;
   items.forEach((it, k) => {
-    const st = it.step, tw = Math.min(ww - 40, 300), tx = wx + (ww - tw) / 2 + (items.length > 1 ? (k ? 60 : -60) : 0) * (ww > 420 ? 1 : 0.3), ty = racks[k] - 62;
-    const tm = it.timing;
-    const tray = s("g", { class: `tray${it.rung ? " rung" : ""}`, style: `--dish: ${dishColor(st.dish)}`, onclick: () => view(st.id) },
-      s("rect", { class: "dish-lip", x: tx - 6, y: ty + 4, width: tw + 12, height: 18, rx: 9 }),
-      s("rect", { class: "dish-body", x: tx, y: ty + 8, width: tw, height: 52, rx: 14 }),
-      s("text", { x: tx + tw / 2 - (tm ? 34 : 0), y: ty + 42 }, abbreviate(st.dish, tm ? 16 : 22)));
+    const st = it.step, tm = it.timing, ty = wy + (items.length > 1 ? 30 + k * (wh / 2) : wh / 2 - 14), tx = wx + 28, tw = ww - 56;
+    const tray = s("g", { class: `tray${it.rung ? " rung" : ""}`, onclick: () => view(st.id) },
+      s("text", { x: tx, y: ty + 18 }, abbreviate(st === o.heating?.step ? "Heating" : st.dish, 22)));
     if (tm) {
-      const t = timeText(tm, tx + tw - 14, ty + 44, "t"); t.setAttribute("text-anchor", "end"); tray.append(t);
-      tray.append(s("line", { class: "track", x1: tx + 12, y1: ty + 70, x2: tx + tw - 12, y2: ty + 70 }),
-        s("line", { class: "bar", x1: tx + 12, y1: ty + 70, x2: tx + tw - 12, y2: ty + 70, ...ringAttrs(tm) }));
+      tray.append(timeText(tm, tx + tw, ty + 18, "t"),
+        s("line", { class: "track", x1: tx, y1: ty + 36, x2: tx + tw, y2: ty + 36 }), s("line", { class: "bar", x1: tx, y1: ty + 36, x2: tx + tw, y2: ty + 36, ...ringAttrs(tm) }));
     }
+    if (st.id === focusId) tray.append(s("rect", { class: "focus", x: tx - 14, y: ty - 10, width: tw + 28, height: 60, rx: 12 }));
     el.append(tray);
-    if (it.focus?.primary) el.append(marker(tx + tw / 2, ty - 6, it.rung));
   });
-  if (!oven.items.length && !oven.heating && i === 0 && View.ovenNext) {
-    const nx = View.ovenNext;
-    el.append(s("text", { class: "oven-next", x: wx + ww / 2, y: wy + wh / 2 + 6, "data-until": stateAt + nx.start * 60000, "data-in": "" }, `in ${hours(nx.start)}`),
-      s("text", { class: "oven-next", x: wx + ww / 2, y: wy + wh / 2 + 30 }, abbreviate(nx.title, 26)));
-  }
   return el;
-}
-
-function counterItems(items) {
-  const g = s("g", {});
-  const x0 = COUNTER.x + 30, w = COUNTER.w - 50;
-  items.slice(0, 3).forEach((it, k) => {
-    const y = TOP_Y + 40 + k * 96;
-    if (it.kind === "timer") {
-      const tm = it.timing, cx = x0 + 60, cy = y + 30;
-      g.append(s("g", { class: `egg${it.rung ? " rung" : ""}` },
-        s("ellipse", { class: "shadow", cx: cx + 6, cy: cy + 34, rx: 40, ry: 12 }),
-        s("ellipse", { class: "shell", cx, cy, rx: 38, ry: 40 }), s("rect", { class: "band", x: cx - 38, y: cy - 6, width: 76, height: 14, rx: 2 })),
-        s("g", { class: `board${it.rung ? " rung" : ""}` },
-          s("text", { class: "label", x: cx + 56, y: cy - 8 }, "Timer"), s("text", { class: "title", x: cx + 56, y: cy + 16 }, abbreviate(it.label, 14)),
-          (() => { const t = timeText(tm, x0 + w, cy + 16, "t"); return t; })()));
-      return;
-    }
-    const st = it.step, tm = it.timing;
-    const b = s("g", { class: `board${it.rung ? " rung" : ""}`, style: `--dish: ${dishColor(st.dish)}`, "data-key": it.key, onclick: () => view(st.id) },
-      s("rect", { class: "shadow", x: x0 + 6, y: y + 12, width: w, height: 70, rx: 18 }),
-      s("rect", { class: "edge", x: x0, y: y + 8, width: w, height: 70, rx: 18 }),
-      s("rect", { class: "slab", x: x0, y, width: w, height: 70, rx: 18 }),
-      s("circle", { class: "dot", cx: x0 + 22, cy: y + 24, r: 7 }),
-      s("text", { class: "label", x: x0 + 36, y: y + 28 }, abbreviate(st.dish, 18)),
-      s("text", { class: "title", x: x0 + 16, y: y + 54 }, abbreviate(st.title, tm ? 15 : 22)));
-    if (tm) b.append(timeText(tm, x0 + w - 16, y + 54, "t"));
-    g.append(b);
-    if (st.hands_on && st.cook != null && state.cooks.length > 1) g.append(cookToken(x0 + w - 6, y + 4, st.cook));
-    if (it.focus?.primary) g.append(marker(x0 + w / 2, y - 14, it.rung));
-  });
-  return g;
-}
-
-// Dinner's up: a plate of each dish on the counter, steaming.
-function plates(ds) {
-  const g = s("g", {});
-  const per = Math.min(4, ds.length), cols = per > 2 ? 2 : 1, rx = cols > 1 ? 66 : 100, ry = rx * K;
-  ds.slice(0, 4).forEach((d, k) => {
-    const col = cols > 1 ? k % 2 : 0, row = cols > 1 ? Math.floor(k / 2) : k;
-    const cx = COUNTER.x + COUNTER.w / 2 + (cols > 1 ? (col ? 1 : -1) * (rx + 8) : 0), cy = TOP_Y + 90 + row * (ry * 2 + 70);
-    const p = s("g", { class: "drop", style: `--dish: ${dishColor(d)}; animation-delay: ${k * 0.12}s` },
-      s("ellipse", { class: "shadow", cx: cx + 5, cy: cy + 6, rx, ry }),
-      s("ellipse", { cx, cy, rx, ry, fill: "#fff" }), s("ellipse", { cx, cy, rx: rx * 0.72, ry: ry * 0.72, fill: "#eee8dc" }),
-      s("ellipse", { cx, cy: cy - 6, rx: rx * 0.48, ry: ry * 0.6, fill: "var(--dish)" }),
-      s("ellipse", { cx: cx - rx * 0.15, cy: cy - ry * 0.35, rx: rx * 0.18, ry: ry * 0.18, fill: "#fff", opacity: 0.35 }),
-      s("text", { x: cx, y: cy + ry + 26, "text-anchor": "middle", style: "font: 800 15px var(--display); fill: #3b2a14" }, abbreviate(d, 16)));
-    const puff = s("g", { class: "puff" });
-    [[-0.2, 0], [0.15, 1.1]].forEach(([dx, dl]) => puff.append(s("circle", { cx: cx + rx * dx, cy: cy - ry, r: rx * 0.16, style: `animation-delay: ${dl}s` })));
-    g.append(p, puff);
-  });
-  return g;
-}
-
-function defs() {
-  return s("defs", {},
-    s("pattern", { id: "tiles", width: 60, height: 30, patternUnits: "userSpaceOnUse" },
-      s("rect", { width: 60, height: 30, fill: "var(--wall)" }),
-      s("path", { d: "M0 29.5H60M0.5 0V15M30.5 15V30M0 14.5H60", stroke: "var(--tile)", "stroke-width": 2, fill: "none" })),
-    s("linearGradient", { id: "shine", x1: 0, x2: 1 },
-      s("stop", { offset: 0, "stop-color": "#000", "stop-opacity": 0.12 }), s("stop", { offset: 0.18, "stop-color": "#fff", "stop-opacity": 0.32 }),
-      s("stop", { offset: 0.32, "stop-color": "#fff", "stop-opacity": 0 }), s("stop", { offset: 0.75, "stop-color": "#000", "stop-opacity": 0.08 }),
-      s("stop", { offset: 1, "stop-color": "#000", "stop-opacity": 0.32 })),
-    s("radialGradient", { id: "gloss", cx: 0.35, cy: 0.3, r: 0.7 },
-      s("stop", { offset: 0, "stop-color": "#fff", "stop-opacity": 0.35 }), s("stop", { offset: 0.5, "stop-color": "#fff", "stop-opacity": 0 }),
-      s("stop", { offset: 1, "stop-color": "#000", "stop-opacity": 0.12 })),
-    s("radialGradient", { id: "oven-glow", cx: 0.5, cy: 0.2, r: 0.9 },
-      s("stop", { offset: 0, "stop-color": "#ffb04a", "stop-opacity": 0.95 }), s("stop", { offset: 0.6, "stop-color": "#e8561c", "stop-opacity": 0.55 }),
-      s("stop", { offset: 1, "stop-color": "#5a1a08", "stop-opacity": 0.2 })),
-    s("filter", { id: "puff", x: "-50%", y: "-50%", width: "200%", height: "200%" }, s("feGaussianBlur", { stdDeviation: 4 })),
-    s("filter", { id: "soft", x: "-20%", y: "-40%", width: "140%", height: "180%" }, s("feGaussianBlur", { stdDeviation: 6 })));
-}
-
-// The oven clock on the backguard: how long until dinner, or the time of day.
-function backguard() {
-  const { x, w, top, guard } = RANGE, y = top - guard;
-  const g = s("g", {});
-  g.append(s("rect", { class: "enamel-lo", x, y: y - 6, width: w, height: guard + 12, rx: 16 }),
-    s("rect", { class: "enamel", x, y: y - 10, width: w, height: guard + 4, rx: 16 }),
-    s("rect", { class: "enamel-hi", x: x + 12, y: y - 6, width: w - 24, height: 5, rx: 2.5, opacity: 0.6 }),
-    s("text", { class: "plate", x: x + 30, y: y + 30 }, "basil"));
-  const late = lateBy() > LATE_AFTER;
-  const serve = state.serve_at && plan().open.length;
-  const cw = 220, cx = x + w / 2 - cw / 2;
-  const clockG = s("g", { class: "clock", onclick: () => { sound.tap(); openSheet(sheetView === "plan" ? "nothing" : "plan"); } },
-    s("rect", { class: "chrome-lo", x: cx - 5, y: y - 5, width: cw + 10, height: guard - 6, rx: 15 }),
-    s("rect", { class: "lcd", x: cx, y, width: cw, height: guard - 16, rx: 11 }));
-  if (serve) {
-    const until = state.serve_at * 1000;
-    clockG.append(s("text", { class: "lcd-label", x: cx + 32, y: y + 22 }, "EAT"), s("text", { class: "lcd-label", x: cx + 32, y: y + 37 }, "IN"),
-      s("text", { class: `lcd-text${late ? " late" : ""}`, x: cx + cw - 16, y: y + 37, "text-anchor": "end", "data-until": until, "data-clock": "" }, clock((until - Date.now()) / 1000)));
-  } else {
-    clockG.append(s("text", { class: "lcd-text", x: cx + cw / 2, y: y + 37, "text-anchor": "middle", "data-now": "" }, atClock(Date.now()).replace(/\s?[AP]M$/i, "")));
-  }
-  g.append(clockG);
-  return g;
 }
 
 let lastKeys = new Set();
 function drawScene() {
-  const { B, O, burners, ovens, ovenNext, counter } = placement();
-  View.ovenNext = ovenNext;
+  const { B, O, burners, ovens } = placement();
+  const focusId = objectives()[0]?.s?.id;
   const grid = burnerGrid(B);
-  const svg = s("svg", { viewBox: `10 ${TOP_Y - 96} ${W - 20} ${FLOOR_Y - TOP_Y + 130}`, preserveAspectRatio: "xMidYMid meet" });
-  svg.append(defs());
-  // Wall, floor, the counter run.
-  svg.append(s("rect", { class: "tiles", x: -3000, y: -2000, width: W + 6000, height: FLOOR_Y + 2000 }),
-    s("rect", { class: "floor", x: -3000, y: FLOOR_Y - 4, width: W + 6000, height: 2000 }),
-    s("ellipse", { class: "shadow", cx: (RANGE.x + COUNTER.x + COUNTER.w) / 2, cy: FLOOR_Y + 6, rx: (COUNTER.x + COUNTER.w - RANGE.x) / 2 + 20, ry: 16 }));
-  // Counter: butcher block on cream cabinets.
-  const cx = COUNTER.x, cw = COUNTER.w;
-  svg.append(s("rect", { class: "cab", x: cx + 6, y: FRONT_Y - 4, width: cw - 12, height: FLOOR_Y - FRONT_Y - 8, rx: 10 }),
-    s("rect", { class: "cab", x: cx + 22, y: FRONT_Y + 18, width: cw - 44, height: 74, rx: 10 }),
-    s("rect", { class: "cab", x: cx + 22, y: FRONT_Y + 106, width: (cw - 54) / 2, height: FLOOR_Y - FRONT_Y - 134, rx: 10 }),
-    s("rect", { class: "cab", x: cx + 32 + (cw - 54) / 2, y: FRONT_Y + 106, width: (cw - 54) / 2, height: FLOOR_Y - FRONT_Y - 134, rx: 10 }),
-    s("rect", { class: "cab-handle", x: cx + cw / 2 - 40, y: FRONT_Y + 50, width: 80, height: 10, rx: 5 }),
-    s("rect", { class: "cab-handle", x: cx + cw / 2 - 30, y: FRONT_Y + 130, width: 10, height: 60, rx: 5 }),
-    s("rect", { class: "cab-handle", x: cx + cw / 2 + 20, y: FRONT_Y + 130, width: 10, height: 60, rx: 5 }),
-    s("rect", { class: "wood-lo", x: cx, y: TOP_Y + RANGE.depth - 2, width: cw, height: RANGE.lip + 6, rx: 6 }),
-    s("rect", { class: "wood", x: cx, y: TOP_Y, width: cw, height: RANGE.depth, rx: 4 }));
-  // The range: backguard with its clock, cooktop, lip, front.
-  svg.append(backguard());
-  svg.append(s("rect", { class: "cooktop-edge", x: RANGE.x, y: TOP_Y + RANGE.depth - 6, width: RANGE.w, height: RANGE.lip + 10, rx: 8 }),
-    s("rect", { class: "cooktop", x: RANGE.x, y: TOP_Y, width: RANGE.w, height: RANGE.depth, rx: 10 }),
-    s("rect", { class: "chrome", x: RANGE.x - 4, y: TOP_Y + RANGE.depth, width: RANGE.w + 8, height: RANGE.lip, rx: 9 }),
-    s("rect", { class: "enamel-lo", x: RANGE.x, y: FRONT_Y - 2, width: RANGE.w, height: FLOOR_Y - FRONT_Y - 6, rx: 14 }),
-    s("rect", { class: "enamel", x: RANGE.x + 4, y: FRONT_Y - 2, width: RANGE.w - 8, height: FLOOR_Y - FRONT_Y - 14, rx: 12 }),
-    s("rect", { class: "chrome-lo", x: RANGE.x + 30, y: FLOOR_Y - 10, width: 40, height: 14, rx: 4 }),
-    s("rect", { class: "chrome-lo", x: RANGE.x + RANGE.w - 70, y: FLOOR_Y - 10, width: 40, height: 14, rx: 4 }));
-  const primaryKey = [...placementFocus()].find(([, f]) => f.primary)?.[0];
-  // Burners, back row first so the front pots sit in front of them.
-  for (const g of grid) svg.append(grate(g));
-  const order = [...grid].sort((a, b) => a.row - b.row);
-  for (const g of order) {
+  const svg = s("svg", { viewBox: `${RX - 20} ${TOP - 90} ${RW + 40} ${BOTTOM - TOP + 110}`, preserveAspectRatio: "xMidYMid meet" });
+  svg.append(s("defs", {},
+    s("linearGradient", { id: "shade", x1: 0, x2: 1 },
+      s("stop", { offset: 0, "stop-color": "#000", "stop-opacity": 0.1 }), s("stop", { offset: 0.2, "stop-color": "#fff", "stop-opacity": 0.22 }),
+      s("stop", { offset: 0.4, "stop-color": "#fff", "stop-opacity": 0 }), s("stop", { offset: 1, "stop-color": "#000", "stop-opacity": 0.28 })),
+    s("radialGradient", { id: "glow", cx: 0.5, cy: 0.3, r: 0.9 },
+      s("stop", { offset: 0, "stop-color": "#ffa94a", "stop-opacity": 0.9 }), s("stop", { offset: 1, "stop-color": "#7a2408", "stop-opacity": 0.35 }))));
+  svg.append(s("rect", { class: "front-lo", x: RX, y: FRONT - 4, width: RW, height: BOTTOM - FRONT + 4, rx: 16 }),
+    s("rect", { class: "front", x: RX + 4, y: FRONT - 4, width: RW - 8, height: BOTTOM - FRONT - 6, rx: 14 }),
+    s("rect", { class: "cooktop", x: RX, y: TOP, width: RW, height: DEPTH + 6, rx: 14 }),
+    s("rect", { class: "lip", x: RX - 4, y: TOP + DEPTH, width: RW + 8, height: LIP, rx: 7 }));
+  for (const g of grid) svg.append(s("ellipse", { class: "bowl", cx: g.cx, cy: g.cy, rx: g.r, ry: g.r * K }), s("ellipse", { class: "cap", cx: g.cx, cy: g.cy, rx: g.r * 0.28, ry: g.r * 0.28 * K }));
+  for (const g of [...grid].sort((a, b) => a.row - b.row)) {
     const spot = burners[g.b];
-    svg.append(spot.pan ? vessel(g, spot.pan, spot.pan.step.id === primaryKey) : emptyBurner(g, spot.ghost));
+    svg.append(spot.pan ? pot(g, spot.pan, spot.pan.step.id === focusId) : burner(g, spot.ghost));
   }
-  svg.append(plan().eating && !plan().open.length ? plates(dishes()) : counterItems(counter));
-  // Knobs: one per burner, then the oven's.
-  const ky = FRONT_Y + 44, n = B + O, span = RANGE.w - 120;
-  grid.forEach((g, i) => {
-    const pan = burners[g.b].pan, on = pan?.step.status === "in_progress";
-    svg.append(knob(RANGE.x + 60 + (span * (i + 0.5)) / n, ky, on, on && LOW.test(`${pan.step.title} ${pan.step.text}`), i));
-  });
-  ovens.forEach((o, i) => svg.append(knob(RANGE.x + 60 + (span * (B + i + 0.5)) / n, ky, o.hot, false, B + i)));
-  // Oven doors share the front.
-  const dy = FRONT_Y + 92, dh = FLOOR_Y - dy - 30;
   if (O) {
-    const gap = 16, dw = (RANGE.w - 50 - gap * (O - 1)) / O;
-    ovens.forEach((o, i) => svg.append(ovenDoor(RANGE.x + 25 + i * (dw + gap), dy, dw, dh, o, i)));
-  } else {
-    svg.append(s("rect", { class: "door", x: RANGE.x + 25, y: dy, width: RANGE.w - 50, height: dh, rx: 20 }));
+    const gap = 16, y = FRONT + 22, hgt = BOTTOM - y - 24, w = (RW - 48 - gap * (O - 1)) / O;
+    ovens.forEach((o, i) => svg.append(oven(RX + 24 + i * (w + gap), y, w, hgt, o, focusId)));
   }
-  // Pots and boards that just appeared drop in.
   const keys = new Set();
   for (const el of svg.querySelectorAll("[data-key]")) {
     keys.add(el.dataset.key);
     if (!lastKeys.has(el.dataset.key) && !reduced()) el.classList.add("drop");
   }
   lastKeys = keys;
-  const scene = $("scene");
-  if (scene.classList.contains("ignite")) svg.classList.add("ignite");
-  scene.replaceChildren(svg);
+  if ($("scene").classList.contains("ignite")) svg.classList.add("ignite");
+  $("scene").replaceChildren(svg);
 }
-const placementFocus = () => {
-  const objs = objectives();
-  const m = new Map();
-  if (objs[0]?.s) m.set(objs[0].s.id, { primary: true });
-  return m;
-};
 
-// ---------- the quest card ----------
-const POT_ICON = () => { const i = s("svg", { viewBox: "0 0 18 14", "aria-hidden": "true" }); i.append(s("path", { d: "M3 4h12v6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z M1 5h2 M15 5h2 M2 3h14", fill: "#fff", stroke: "#fff", "stroke-width": 2, "stroke-linecap": "round" })); return i; };
-function where(st) {
-  if (st.equipment === "oven") return "Oven";
-  if (st.equipment === "none") return "Counter";
-  const b = burnerOf.get(st.id);
-  if (b == null) return "Stove";
-  const g = burnerGrid(kitchenSize().B)[b];
-  return g && g.name !== "the" ? `${g.name[0].toUpperCase()}${g.name.slice(1)} burner` : "Burner";
+// ---------- the card ----------
+function meta(st, o) {
+  const name = o?.cook != null && state.cooks.length > 1 ? state.cooks[o.cook] : o?.anyone ? "Anyone" : null;
+  return h("div", { class: "meta" },
+    o?.kind === "rang" && h("span", { class: "alarm" }, "Time's up"),
+    name && h("span", { class: "who", style: `--cook: ${cookColor(o.cook)}` }, name),
+    st && h("span", { class: "dish", style: `--dish: ${dishColor(st.dish)}` }, st.dish));
 }
-function avatarTag(i) {
-  const name = state.cooks[i];
-  return h("span", { class: "tag cook", style: `--cook: ${cookColor(i)}` }, h("span", { class: "avatar" }, (name?.[0] || "?").toUpperCase()), name);
+function button(a, o) {
+  if (!a.primary && o.kind === "step") return h("button", { class: "quiet", onclick: () => a.run() }, a.label);
+  return h("button", { class: `go${o.kind === "rang" ? " alarm" : ""}`, onclick: (e) => { pressed(e.currentTarget); a.run(); } }, a.label);
 }
-function stepTags(st, o) {
-  const total = state.steps.filter((x) => x.dish === st.dish).length;
-  return h("div", { class: "tags" },
-    o.cook != null && state.cooks.length > 1 ? avatarTag(o.cook) : o.anyone ? h("span", { class: "tag" }, "Anyone") : null,
-    h("span", { class: "tag dish", style: `--dish: ${dishColor(st.dish)}` }, POT_ICON(), st.dish),
-    h("span", { class: "tag where" }, where(st)),
-    total > 1 && h("span", { class: "tag where" }, `${stepNumber(st)} of ${total}`));
-}
-function goButton(a, o, small) {
-  const cls = `go${o.kind === "rang" ? " alarm" : ""}`;
-  return h("button", { class: cls, onclick: (e) => { press(e.currentTarget, o); a.run(); } }, a.label, !small && h("kbd", {}, "⏎"));
-}
-function uses(st) {
-  const items = stepUses(st);
-  return items.length > 0 && h("ul", { class: "uses" }, items.map((u) => h("li", { class: u.out ? "out" : false }, u.amount && h("span", { class: "amt" }, u.amount), u.name)));
-}
-function bigCard(o, enter) {
+function nowCard(o, enter) {
+  const cls = `now${enter ? " enter" : ""}${o.kind === "rang" ? " rung" : ""}`;
   const a = objectiveAction(o);
-  if (o.kind === "eat") {
-    return h("section", { class: `card${enter ? " enter" : ""}`, "data-key": o.key },
-      h("div", { class: "tags" }, h("span", { class: "tag dish", style: "--dish: var(--go)" }, "Served")),
-      h("h1", {}, "Dinner's up."), h("p", { class: "sub" }, "Everything's done. Enjoy it."),
-      h("div", { class: "act" }, goButton(a, o)));
-  }
-  if (o.kind === "rang") {
-    const st = o.s;
-    return h("section", { class: `card alarm${enter ? " enter" : ""}`, "data-key": o.key },
-      h("div", { class: "tags" }, h("span", { class: "tag alarm" }, "Time's up"), st && h("span", { class: "tag dish", style: `--dish: ${dishColor(st.dish)}` }, POT_ICON(), st.dish)),
-      h("h1", {}, st ? st.title : words(o.label)),
-      st && instructionLines(st.text),
-      h("div", { class: "act" }, goButton(a, o), h("button", { class: "ghost", onclick: () => moreTime(o) }, "+1 min")));
-  }
-  const st = o.s, due = st.status === "pending" && st.start === 0;
-  const waiting = st.status === "pending" && st.start > 0;
-  const tm = timing(st);
-  return h("section", { class: `card${enter ? " enter" : ""}`, "data-key": o.key, style: `--dish: ${dishColor(st.dish)}` },
+  if (o.kind === "eat") return h("section", { class: cls }, h("h1", {}, "Dinner's up."), h("p", { class: "sub" }, "Everything's done."), h("div", { class: "act" }, button(a, o)));
+  const st = o.s;
+  const items = st ? stepUses(st) : [];
+  return h("section", { class: cls },
     o.viewing && h("button", { class: "back", onclick: backToNow }, "← Back to now"),
-    stepTags(st, o),
-    h("h1", {}, st.title),
-    !sameWords(st.title, st.text) && instructionLines(st.text),
-    uses(st),
-    waiting && h("div", { class: "when" }, h("span", { "data-until": stateAt + st.start * 60000, "data-in": "" }, `in ${hours(st.start)}`), h("small", {}, `at ${atClock(stateAt + st.start * 60000)}`)),
-    st.status === "in_progress" && tm && h("div", { class: "when" }, h("span", { "data-until": tm.until, "data-clock": "" }, clock((tm.until - Date.now()) / 1000)), h("small", {}, "left")),
-    a && h("div", { class: "act" }, a.primary ? goButton(a, o) : h("button", { class: "ghost", onclick: () => a.run() }, a.label)));
+    meta(st, o),
+    h("h1", {}, st ? st.title : words(o.label)),
+    st && !sameWords(st.title, st.text) && instructionLines(st.text),
+    items.length > 0 && h("p", { class: "uses" }, items.flatMap((u, i) => [i > 0 ? " · " : null, h("span", { class: u.out ? "out" : false }, [u.amount, u.name].filter(Boolean).join(" "))])),
+    o.waiting && h("div", { class: "when", "data-until": stateAt + st.start * 60000, "data-in": "" }, `in ${hours(st.start)}`),
+    a && h("div", { class: "act" }, button(a, o), o.kind === "rang" && h("button", { class: "quiet", onclick: () => moreTime(o) }, "+1 min")));
 }
-function smallCard(o, enter) {
-  const st = o.s, a = objectiveAction(o);
-  return h("section", { class: `card small${enter ? " enter" : ""}`, "data-key": o.key },
-    h("div", { class: "main" },
-      h("div", { class: "tags" },
-        o.cook != null && state.cooks.length > 1 ? avatarTag(o.cook) : o.anyone ? h("span", { class: "tag" }, "Anyone") : null,
-        h("span", { class: "tag dish", style: `--dish: ${dishColor(st.dish)}` }, POT_ICON(), st.dish)),
-      h("h1", {}, st.title)),
-    a && (a.primary ? goButton(a, o, true) : h("button", { class: "ghost", onclick: () => a.run() }, a.label)));
-}
-function nextList(n) {
-  const next = comingUp(n);
-  if (!next.length) return null;
-  return h("div", { class: "next" }, h("h2", {}, "Up next"), next.map((x) => h("button", { style: `--dish: ${dishColor(x.dish)}`, onclick: () => view(x.id) },
-    h("small", { "data-until": stateAt + x.start * 60000, "data-in": "" }, `in ${hours(x.start)}`), h("i"),
-    h("span", {}, cookName(x) && h("span", { class: "by" }, `${cookName(x)} · `), x.title))));
-}
-const IDEAS = ["Salmon and rice for two, at 7", "Something with what's in the fridge", "How do I use a moka pot?"];
-function helloCard() {
-  if (busyWith) return h("section", { class: "card" }, h("p", { class: "hello working", "data-busy": "" }, busyText()));
-  const asleep = !ws;
-  return h("section", { class: "card", "data-key": "hello" },
-    h("p", { class: "hello" }, hello()),
-    asleep ? h("p", { class: "sub" }, "Light the stove and tell Basil.") : h("p", { class: "sub" }, "Basil's listening. Just say it."),
-    !asleep && h("div", { class: "ideas" }, IDEAS.map((t) => h("span", {}, t))),
-    asleep && h("div", { class: "act" }, h("button", { class: "go light", onclick: (e) => { press(e.currentTarget); talkPress(); } }, "Light the stove", h("kbd", {}, "Space"))));
-}
-
-let lastCards = new Set();
-function drawQuest() {
-  const box = $("quest");
-  const objs = objectives();
-  const keys = new Set(objs.map((o) => o.key));
-  const enter = (k) => !lastCards.has(k) && !reduced();
-  let cards;
-  if (!objs.length) cards = [helloCard()];
-  else {
-    const [first, ...rest] = objs;
-    const others = rest.filter((o) => o.s).slice(0, 2);
-    cards = [bigCard(first, enter(first.key)), ...others.map((o) => smallCard(o, enter(o.key)))];
-    if (!viewing) cards.push(nextList(others.length ? 2 : 3));
+// Everyone else's step, and what's on the counter, a line each.
+function alsoList(rest) {
+  const rows = rest.filter((o) => o.s).map((o) => {
+    const a = objectiveAction(o), name = o.cook != null && state.cooks.length > 1 ? state.cooks[o.cook] : null;
+    return h("div", { class: "row" }, h("span", {}, name && h("span", { class: "who", style: `--cook: ${cookColor(o.cook)}` }, `${name}  `), o.s.title),
+      a && h("button", { onclick: () => a.run() }, a.label));
+  });
+  const shown = new Set(rest.map((o) => o.s?.id));
+  for (const it of placement().counter) {
+    if (it.step && (shown.has(it.step.id) || objectives()[0]?.s?.id === it.step.id)) continue;
+    const tm = it.timing;
+    rows.push(h("div", { class: `row${it.rung ? " rung" : ""}` }, h("span", {}, it.step ? it.step.title : it.label),
+      tm && (tm.paused ? h("span", { class: "t" }, clock(tm.left)) : h("span", { class: "t", "data-until": tm.until, "data-clock": "" }, clock((tm.until - Date.now()) / 1000)))));
   }
-  lastCards = keys;
-  box.replaceChildren(...cards.filter(Boolean));
+  return rows.length ? h("div", { class: "also" }, rows) : null;
 }
-
-// ---------- chrome: nav, keys, captions ----------
-let doneBefore = null; // the steps done at the last draw; a newly done one pops
-function drawTrack() {
-  const el = $("track"), steps = plan().steps;
-  el.hidden = !steps.length;
-  if (!steps.length) return;
-  const sorted = [...steps].sort((a, b) => dishIndex(a.dish) - dishIndex(b.dish));
-  const done = steps.filter((x) => x.status === "done").length;
-  const now = new Set(steps.filter((x) => x.status === "done").map((x) => x.id));
-  el.replaceChildren(
-    h("span", { class: "segs" }, sorted.map((x) => h("i", { class: `seg${x.status === "done" ? " done" : x.status === "in_progress" ? " now" : ""}${x.status === "done" && doneBefore && !doneBefore.has(x.id) ? " pop" : ""}`,
-      style: `--dish: ${dishColor(x.dish)}` }))),
-    h("b", {}, `${done}`, h("small", {}, ` / ${steps.length}`)));
-  doneBefore = now;
-  el.onclick = () => { sound.tap(); openSheet(sheetView === "plan" ? "nothing" : "plan"); };
+function helloCard() {
+  if (busyWith) return h("section", { class: "now" }, h("p", { class: "hello working", "data-busy": "" }, busyText()));
+  return h("section", { class: "now" },
+    h("p", { class: "hello" }, hello()),
+    h("p", { class: "sub" }, ws ? "Basil's listening." : "Press Space or tap Basil to talk."));
+}
+let lastFirst = null;
+function drawQuest() {
+  const [first, ...rest] = objectives();
+  $("quest").replaceChildren(...[first ? nowCard(first, first.key !== lastFirst && !reduced()) : helloCard(), alsoList(rest)].filter(Boolean));
+  lastFirst = first?.key;
 }
 function drawNav() {
-  $("nav").replaceChildren(...navItems().map(({ view: v, label, flag, busy }) =>
-    h("button", { class: [flag && "flag", busy && "busy"].filter(Boolean).join(" "), "aria-expanded": String(sheetView === v),
-      onclick: () => { sound.tap(); openSheet(sheetView === v ? "nothing" : v); } }, label)));
+  $("nav").replaceChildren(...navItems().map(({ view: v, label, flag }) =>
+    h("button", { class: flag ? "flag" : false, "aria-expanded": String(sheetView === v), onclick: () => { sound.tap(); openSheet(sheetView === v ? "nothing" : v); } }, label)));
 }
-function drawKeys() {
-  const talk = pushToTalk ? "hold to talk" : ws ? "mute" : "light";
-  const done = objectives()[0] && objectiveAction(objectives()[0]);
-  $("keys").replaceChildren(...[
-    h("span", {}, h("kbd", {}, "Space"), talk),
-    done && h("span", {}, h("kbd", {}, "⏎"), done.label.toLowerCase()),
-    plan().steps.length > 0 && h("span", {}, h("kbd", {}, "← →"), "look"),
-  ].filter(Boolean));
-}
+function pressed(btn) { btn.classList.add("pressed"); setTimeout(() => btn.classList.remove("pressed"), 120); }
 
-View.render = () => { drawScene(); drawQuest(); drawTrack(); drawNav(); drawKeys(); };
+View.render = () => { drawScene(); drawQuest(); drawNav(); };
 View.tick = (now) => {
   for (const el of document.querySelectorAll("[data-ring]")) {
-    const until = Number(el.dataset.until), total = Number(el.dataset.total) || 1;
-    const rem = el.dataset.until ? Math.max(0, Math.min(1, (until - now) / 1000 / total)) : Math.max(0, Math.min(1, Number(el.dataset.left) / total));
-    el.setAttribute("stroke-dashoffset", (100 * (1 - rem)).toFixed(2));
+    const total = Number(el.dataset.total) || 1;
+    const left = el.dataset.until ? (Number(el.dataset.until) - now) / 1000 : Number(el.dataset.left);
+    el.setAttribute("stroke-dashoffset", (100 * (1 - Math.max(0, Math.min(1, left / total)))).toFixed(2));
   }
-  for (const el of document.querySelectorAll("[data-now]")) el.textContent = atClock(now).replace(/\s?[AP]M$/i, "");
 };
 let mouthRaf = null;
 View.pilot = (mode) => {
-  const p = $("pilot");
+  const p = $("pilot"), mouth = $("mouth");
   p.dataset.mode = mode;
-  p.setAttribute("aria-label", mode === "asleep" ? "Light the stove: talk to Basil" : mode === "off" ? "Unmute" : "Mute");
   cancelAnimationFrame(mouthRaf);
-  const mouth = $("mouth");
   if (mode === "talking" && !reduced()) {
     const loop = () => { mouth.style.transform = `scaleY(${(0.4 + Math.min(1, voiceLevel() * 3.2) * 1.4).toFixed(2)})`; mouthRaf = requestAnimationFrame(loop); };
     loop();
-  } else mouth.style.transform = mode === "asleep" ? "scaleY(.25)" : "scaleY(.55)";
-  drawStatus();
-  if (state) drawKeys();
-};
-function drawStatus() {
-  const st = $("status");
-  const text = busyWith ? busyText() : pilotMode === "thinking" ? "Basil's thinking…" : "";
-  st.hidden = !text; st.textContent = text; st.classList.toggle("working", !!text);
+  } else mouth.style.transform = mode === "asleep" ? "scaleY(.2)" : "scaleY(.5)";
+  const st = $("status"), text = busyWith ? busyText() : mode === "thinking" ? "Thinking…" : "";
+  st.hidden = !text; st.textContent = text;
   if (busyWith) st.setAttribute("data-busy", ""); else st.removeAttribute("data-busy");
-}
-View.said = (who, text, live) => {
-  if (who === "you") {
-    const el = $("you");
-    el.hidden = !text; el.textContent = text; el.classList.toggle("live", !!live);
-  } else {
-    const el = $("basil");
-    el.hidden = !text && !live; el.firstChild.textContent = text; el.classList.toggle("pondering", !!live && !text);
-    if (!text && live) el.firstChild.textContent = "…";
-  }
+  if (state) drawQuest();
 };
-View.stream = (piece, all) => {
+View.said = (who, text, live) => {
+  const el = $(who === "you" ? "you" : "basil");
+  el.hidden = !text && !(live && who === "basil");
+  el.textContent = text || (live ? "…" : "");
+  el.classList.toggle(who === "you" ? "live" : "pondering", !!live && (who === "you" || !text));
+};
+View.stream = (piece) => {
   const el = $("basil");
   el.hidden = false; el.classList.remove("pondering");
-  const span = el.firstChild;
-  if (span.textContent === "…") span.textContent = "";
-  span.append(h("i", {}, piece));
+  if (el.textContent === "…") el.textContent = "";
+  el.append(h("i", {}, piece));
 };
-// Basil arrives: every burner catches, the knobs twist, the leaf hops.
+// Basil arrives: every burner catches in turn.
 View.ignite = () => {
-  const scene = $("scene");
-  scene.classList.add("ignite");
-  scene.querySelector("svg")?.classList.add("ignite");
-  $("pilot").classList.add("hop");
-  setTimeout(() => { scene.classList.remove("ignite"); scene.querySelector("svg")?.classList.remove("ignite"); $("pilot").classList.remove("hop"); }, 2200);
-  if (state) View.render();
+  $("scene").classList.add("ignite"); $("pilot").classList.add("hop");
+  if (state) drawScene();
+  setTimeout(() => { $("scene").classList.remove("ignite"); $("pilot").classList.remove("hop"); if (state) drawScene(); }, 2000);
 };
-View.pressed = (o) => { const b = document.querySelector("#quest .go"); if (b) press(b, o); };
-
-// A press: the key goes down, and a done step throws confetti.
-function press(btn, o) {
-  btn.classList.add("pressed");
-  setTimeout(() => btn.classList.remove("pressed"), 140);
-  const a = o && objectiveAction(o);
-  if (!a || reduced() || !(a.status === "done" || o.kind === "rang" || o.kind === "eat")) return;
-  const r = btn.getBoundingClientRect(), colors = ["var(--d0)", "var(--d1)", "var(--d2)", "var(--d3)", "var(--gold)", "var(--go)"];
-  for (let i = 0; i < 26; i++) {
-    const bit = h("i", { class: "bit", style: `left: ${r.left + r.width / 2}px; top: ${r.top + r.height / 2}px; background: ${colors[i % colors.length]}` });
-    document.body.append(bit);
-    const ang = -Math.PI / 2 + (Math.random() - 0.5) * 2.2, v = 180 + Math.random() * 220;
-    bit.animate([
-      { transform: "translate(-50%, -50%) rotate(0)", opacity: 1 },
-      { transform: `translate(${Math.cos(ang) * v}px, ${Math.sin(ang) * v + 140}px) rotate(${Math.random() * 720 - 360}deg)`, opacity: 0 },
-    ], { duration: 900 + Math.random() * 400, easing: "cubic-bezier(.2,.7,.4,1)" }).onfinish = () => bit.remove();
-  }
-}
+View.pressed = () => { const b = document.querySelector("#quest .go"); if (b) pressed(b); };
 
 bindTalk($("pilot"));
-// Space lights the stove (or mutes); in hold-to-talk, core.js holds it.
 document.addEventListener("keydown", (e) => {
-  if (e.code !== "Space" || e.repeat || pushToTalk || e.target.matches?.("input, textarea, button, a") || sheetView) return;
+  if (e.code !== "Space" || e.repeat || pushToTalk || sheetView || e.target.matches?.("input, textarea, button, a")) return;
   e.preventDefault(); talkPress();
 });
 startBasil();
