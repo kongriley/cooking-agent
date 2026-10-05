@@ -45,24 +45,25 @@
   .poster + .poster { box-shadow: inset 1px 0 0 var(--line-2); }
   /* With a picture of the step, the picture is the poster. */
   .poster.photo { --fg: #fff; background-image: linear-gradient(rgb(0 0 0 / .6), rgb(0 0 0 / .35) 40%, rgb(0 0 0 / .78)), var(--photo); }
-  .label { display: flex; flex-wrap: wrap; align-items: center; gap: .3em 2em; }
+  .label { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .4em 1.6em; }
   .label .dish { display: flex; align-items: center; gap: .6em; }
-  .label .dish::before { content: ""; width: .9em; height: .9em; background: var(--field); }
-  .t { margin: .3em 0 0 -.03em; font: 700 120px/1 var(--sans); letter-spacing: -.02em; text-wrap: balance; overflow-wrap: normal; }
+  .label .dish::before { content: ""; width: .75em; height: .75em; background: var(--field); }
+  .alarm .label .dish::before { display: none; }
+  .t { margin: clamp(16px, 2.2vh, 28px) 0 0 -.04em; font: 700 120px/1 var(--sans); letter-spacing: -.015em; text-wrap: balance; overflow-wrap: normal; }
   .poster.enter .t { animation: rise .6s cubic-bezier(.2, .8, .2, 1) both; }
   .poster.enter .body { animation: rise .6s .07s cubic-bezier(.2, .8, .2, 1) both; }
   @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
-  .body { margin-top: auto; display: grid; max-width: 30em; font-size: var(--body, 28px); }
+  .body { margin-top: clamp(24px, 3.6vh, 44px); display: grid; max-width: 28em; font-size: var(--body, 28px); }
   /* One sentence to a line, a hairline between, like the fields of a form. */
   .say-it { display: grid; font: 400 1em/1.3 var(--sans); letter-spacing: 0; }
-  .say-it p { margin: 0; padding: .45em 0 .5em; border-top: 1px solid var(--rule); text-wrap: pretty; }
+  .say-it p { margin: 0; padding: .5em 0 .55em; border-top: 1px solid var(--rule); text-wrap: pretty; }
   .say-it p:last-child { border-bottom: 1px solid var(--rule); }
   .say-it b { font-weight: 700; }
   .say-it .cue { font-weight: 400; }
-  .foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 1em; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: .9em; }
   .uses { margin: 0; max-width: 60ch; }
   .uses .out { text-decoration: line-through; }
-  .when { font: 700 var(--clock, 64px)/1 var(--sans); letter-spacing: -.02em; margin-top: .25em; font-variant-numeric: tabular-nums; }
+  .when { font: 700 var(--clock, 64px)/1 var(--sans); letter-spacing: -.02em; margin-top: clamp(16px, 2.2vh, 28px); font-variant-numeric: tabular-nums; }
   .tap { flex: none; padding: 10px 18px; border: 1px solid currentColor; }
   .tap { background: var(--ink); color: var(--paper); border-color: var(--ink); padding: 14px 24px; }
   .tap:hover { background: var(--violet); border-color: var(--violet); color: #fff; }
@@ -77,9 +78,9 @@
 
   /* ---------- the rail: timers on black, then the voice ---------- */
   footer { flex: none; }
-  #timers { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: #1a1a1a; color: #fff; box-shadow: inset 0 1px 0 rgb(255 255 255 / .14); }
+  #timers { display: flex; background: #1a1a1a; color: #fff; box-shadow: inset 0 1px 0 rgb(255 255 255 / .14); }
   #timers:empty { display: none; }
-  .timer { position: relative; display: grid; gap: 10px; padding: 16px var(--pad) 18px; min-width: 0; }
+  .timer { position: relative; flex: 0 1 auto; min-width: 0; width: clamp(200px, 22vw, 340px); display: grid; gap: 10px; padding: 16px var(--pad) 18px; }
   .timer + .timer { border-left: 1px solid rgb(255 255 255 / .2); }
   .timer::before { content: ""; position: absolute; left: 0; bottom: 0; height: 4px; width: calc(var(--left) * 100%); background: var(--field); transition: width 1s linear; }
   .timer .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -115,7 +116,8 @@
     .poster + .poster { box-shadow: none; }
     .poster:not(.main) { flex: 0 0 auto; padding-block: 18px; }
     .poster:not(.main) .body { display: none; }
-    #timers { grid-auto-flow: row; }
+    #timers { flex-direction: column; }
+    .timer { width: auto; }
     .timer + .timer { border-left: 0; border-top: 1px solid rgb(255 255 255 / .2); }
     .timer { grid-template-columns: 1fr auto; align-items: baseline; padding-block: 12px; }
     #line q:nth-of-type(n+3) { display: none; }
@@ -214,21 +216,22 @@ function drawPosters() {
   lastKeys = keys;
   $("posters").replaceChildren(...(shown.length ? shown.map((o, i) => poster(o, i === 0 && shown.length > 1, enter)) : [helloPoster()]));
   requestAnimationFrame(() => {
-    // The others first, so the main poster fits the room they leave.
-    for (const p of [...$("posters").children].sort((a, b) => a.classList.contains("main") - b.classList.contains("main"))) {
-      const hasBody = !!p.querySelector(".say-it p");
-      // Stacked on a phone, the others are a line each under the main poster.
-      const aside = matchMedia("(max-width: 760px)").matches && !p.classList.contains("main") && $("posters").children.length > 1;
-      const size = fit(p.querySelector(".t"), p, aside ? 1 : 3, hasBody ? 0.44 : 0.66, aside ? 44 : 380);
-      let s2 = size;
-      const scale = () => {
-        p.querySelector(".t").style.fontSize = `${s2}px`;
-        p.style.setProperty("--body", `${Math.max(17, Math.min(34, s2 * 0.26))}px`);
-        p.style.setProperty("--clock", `${Math.max(32, Math.min(110, s2 * 0.55))}px`);
-      };
-      scale();
-      // If the instructions don't fit under the title, the title gives way.
-      while (!aside && p.scrollHeight > p.clientHeight + 1 && s2 > 30) { s2 *= 0.94; scale(); }
+    const ps = [...$("posters").children], narrow = matchMedia("(max-width: 760px)").matches;
+    const main = ps.find((p) => p.classList.contains("main")) || ps[0], others = ps.filter((p) => p !== main);
+    const title = (p) => p.querySelector(".t");
+    const body = (s) => Math.round(Math.max(18, Math.min(32, s * 0.24)));
+    const set = (p, s) => { title(p).style.fontSize = `${s}px`; p.style.setProperty("--body", `${body(s)}px`); p.style.setProperty("--clock", `${Math.round(Math.max(32, Math.min(96, s * 0.5)))}px`); };
+    // Stacked on a phone, the others are a line each; fit them first so the main poster gets the room they leave.
+    if (narrow) for (const p of others) set(p, fit(title(p), p, 1, 1, 40));
+    let size = fit(title(main), main, 3, 0.42);
+    set(main, size);
+    while (main.scrollHeight > main.clientHeight + 1 && size > 30) set(main, (size *= 0.94));
+    // Side by side, everyone's title shares the main poster's scale: never bigger than three quarters of it.
+    // Side by side, the others share one size: the smallest any of them fits, and at most three quarters of the main.
+    if (!narrow && others.length) {
+      let s = Math.min(Math.round(size * 0.75), ...others.map((p) => fit(title(p), p, 3, 0.42)));
+      others.forEach((p) => set(p, s));
+      while (others.some((p) => p.scrollHeight > p.clientHeight + 1) && s > 28) { s *= 0.94; others.forEach((p) => set(p, s)); }
     }
   });
 }
