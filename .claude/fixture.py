@@ -44,7 +44,7 @@ def busy():
         ],
         "timers": [timer("rice", 6, "rice_simmer", 15), timer("broccoli", 14, "broc_roast", 20), timer("salmon", 3, "salmon_sear", 4)],
         "serve_at": now + 32 * 60,
-        "history": [{"who": "cook", "text": "Is the salmon ready to flip?"}, {"who": "basil", "text": "Not yet — give it three more minutes, until it's opaque halfway up."}],
+        "history": [{"who": "cook", "text": "Is the salmon ready to flip?"}, {"who": "basil", "text": "Not yet. Give it three more minutes, until it's opaque halfway up."}],
     }
 
 

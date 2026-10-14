@@ -596,7 +596,7 @@ const CORE_CSS = `
   .b-mono { font-family: var(--mono); }
   #b-toast { position: fixed; z-index: 60; left: 50%; bottom: max(110px, calc(env(safe-area-inset-bottom) + 110px)); transform: translateX(-50%);
     display: flex; align-items: center; gap: 14px; padding: 10px 12px 10px 18px; border-radius: 999px; background: var(--ink); color: var(--bg);
-    font: 500 15px var(--display); animation: b-toast .3s cubic-bezier(.3,1.5,.5,1); max-width: calc(100% - 32px); }
+    font: 500 15px var(--display); animation: b-toast .3s cubic-bezier(.16,1,.3,1); max-width: calc(100% - 32px); }
   #b-toast b { font-weight: 700; }
   #b-toast a, #b-toast button { font: inherit; border: 0; cursor: pointer; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; color: var(--ink); background: var(--bg); text-decoration: none; }
   #b-toast button.x { background: none; color: inherit; opacity: .6; padding: 6px; }
